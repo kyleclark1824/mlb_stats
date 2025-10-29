@@ -26,12 +26,13 @@ export const Roster: React.FC<RosterProps> = ({ data, onPlayerClick }) => {
   );
 
   return (
-    <div>
+    <div className="relative">
+      {/* Player Details will be rendered here by the parent component */}
       <h2 className="text-2xl font-semibold text-red-700 dark:text-red-300 mb-6">
         Team Roster
       </h2>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 mt-4">
         {data.map((player) => (
           <div
             key={player.person?.id}

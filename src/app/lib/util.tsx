@@ -72,13 +72,7 @@ export const fetchLastFiveGamesStats = async (teamId: number | string, playerId:
     homeRuns: 0,
     rbi: 0,
   };
-  // Stats for the most recent (last) game in the fetched range
-  const lastGameStats = {
-    atBats: 0,
-    hits: 0,
-    homeRuns: 0,
-    rbi: 0,
-  };
+
   const pitchingStats = {
     inningsPitched: 0,
     strikeOuts: 0,
@@ -86,15 +80,21 @@ export const fetchLastFiveGamesStats = async (teamId: number | string, playerId:
     earnedRuns: 0,
   };
 
+  const lastGameStats = {
+    atBats: 0,
+    hits: 0,
+    homeRuns: 0,
+    rbi: 0,
+  };
+
   for (const game of lastFiveGames) {
-    console.log("fetching");
     const boxScore = await fetchBoxScore(game.gamePk);
-    console.log("boxScore:", boxScore);
     const players = {
       ...boxScore.teams?.home?.players,
       ...boxScore.teams?.away?.players,
     };
     const playerStats = players[`ID${playerId}`];
+    
     if (playerStats) {
       if (playerStats.stats?.batting) {
         if (game.lastGame) {
@@ -111,7 +111,7 @@ export const fetchLastFiveGamesStats = async (teamId: number | string, playerId:
       }
       if (playerStats.stats?.pitching) {
         pitchingStats.inningsPitched += parseFloat(
-          playerStats.stats.pitching.inningsPitched || 0,
+          playerStats.stats.pitching.inningsPitched || "0",
         );
         pitchingStats.strikeOuts += playerStats.stats.pitching.strikeOuts || 0;
         pitchingStats.hits += playerStats.stats.pitching.hits || 0;

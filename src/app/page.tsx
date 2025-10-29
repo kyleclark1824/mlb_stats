@@ -8,34 +8,33 @@ import { Roster } from "./components/roster";
 import { TeamDropdown } from "./components/team-dropdown";
 import { useMLBData, useMLBTeams } from "./lib/hooks";
 import { ErrorBoundary, useRenderCounter } from "./lib/util";
-import { TeamRecordData, Game, Player } from "./lib/types";
+import { TeamRecordData, Game, Player, Team } from "./lib/types";
 import { LastGame, TodaysGame } from "./components/games";
 import { TeamRecord } from "./components/team-record";
 import { CARDINALS_ID } from "./lib/consts";
 
-// --- ThemeToggle Component ---
-interface ThemeToggleProps {
-  isDarkMode: boolean;
-  toggleTheme: () => void;
+// --- TeamLogo Component ---
+interface TeamLogoProps {
+  teamId: string;
+  teams: Team[];
 }
 
-const ThemeToggle: React.FC<ThemeToggleProps> = ({
-  isDarkMode,
-  toggleTheme,
-}) => (
-  <button
-    onClick={toggleTheme}
-    className="p-2 rounded-full bg-gray-200 dark:bg-gray-700 text-black dark:text-white"
-    aria-label={isDarkMode ? "Switch to light mode" : "Switch to dark mode"}
-  >
-    <Image
-      src={isDarkMode ? "/sun.svg" : "/moon.svg"}
-      alt={isDarkMode ? "Light mode icon" : "Dark mode icon"}
-      width={20}
-      height={20}
-    />
-  </button>
-);
+const TeamLogo: React.FC<TeamLogoProps> = ({ teamId, teams }) => {
+  const team = teams.find(t => t.id.toString() === teamId);
+  const teamName = team?.name || 'MLB';
+  
+  return (
+    <div className="flex items-center justify-center w-12 h-12 bg-gray-800 rounded-full overflow-hidden">
+      <Image
+        src={`https://www.mlbstatic.com/team-logos/${teamId}.svg`}
+        alt={`${teamName} logo`}
+        width={40}
+        height={40}
+        className="object-contain"
+      />
+    </div>
+  );
+};
 
 // --- Main Component ---
 const HomePage: React.FC = () => {
@@ -45,14 +44,11 @@ const HomePage: React.FC = () => {
   const [selectedTeamId, setSelectedTeamId] = useState<string>(
     CARDINALS_ID.toString()
   );
-  const [isDarkMode, setIsDarkMode] = useState<boolean>(true);
 
   const { state, fetchPlayerData, clearPlayerInfo } =
     useMLBData(selectedTeamId);
   const { data, playerInfo, teamRecord, todaysGame, lastGame, loading, error } =
     state;
-
-  const toggleTheme = () => setIsDarkMode((prev) => !prev);
 
   // --- Loading state ---
   if (teamsLoading) {
@@ -77,16 +73,10 @@ const HomePage: React.FC = () => {
 
   // --- Main Layout ---
   return (
-    <div
-      className={`min-h-screen ${
-        isDarkMode
-          ? "bg-gray-900 text-white"
-          : "bg-gradient-to-b from-red-900 to-gray-100 text-black"
-      } font-sans`}
-    >
+    <div className="min-h-screen bg-gray-900 text-white font-sans">
       <ErrorBoundary>
         {/* HEADER */}
-        <header className="bg-red-700 dark:bg-gray-800 text-white py-8 text-center">
+        <header className="bg-gray-800 text-white py-8 text-center">
           <Image
             src="/mlb-logo.png"
             alt="MLB Logo"
@@ -103,9 +93,9 @@ const HomePage: React.FC = () => {
               selectedTeamId={selectedTeamId}
               onSelectTeam={setSelectedTeamId}
             />
-            <ThemeToggle
-              isDarkMode={isDarkMode}
-              toggleTheme={toggleTheme}
+            <TeamLogo
+              teamId={selectedTeamId}
+              teams={teams}
             />
           </div>
         </header>
@@ -114,6 +104,12 @@ const HomePage: React.FC = () => {
         <main className="container mx-auto py-8 px-4">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-1 space-y-6">
+                {playerInfo && (
+                <PlayerDetails
+                  playerInfo={playerInfo}
+                  onClose={clearPlayerInfo}
+                />
+              )}
               {!!teamRecord && <TeamRecord record={teamRecord as TeamRecordData} />}
               {!!todaysGame && <TodaysGame game={todaysGame as Game} />}
               {!!lastGame && <LastGame game={lastGame as Game} />}
@@ -130,12 +126,7 @@ const HomePage: React.FC = () => {
                 )}
               </div>
 
-              {playerInfo && (
-                <PlayerDetails
-                  playerInfo={playerInfo}
-                  onClose={clearPlayerInfo}
-                />
-              )}
+            
             </div>
           </div>
         </main>

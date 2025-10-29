@@ -1,6 +1,6 @@
 import { useState, useEffect, useReducer, useCallback } from "react";
 import {fetchTeams, fetchTeamDetails, fetchRoster, fetchSchedule, fetchLastGame, fetchBoxScore, fetchPlayerDetails } from './api'
-import { Game, Roster, TeamRecordData, PlayerDetail } from './types'
+import { Game, Roster, TeamRecordData, PlayerDetail, BoxScoreStats } from './types'
 
 // --- Types ---
 type Team = { league?: { id?: number }; [key: string]: unknown };
@@ -158,45 +158,67 @@ export const useMLBData = (teamId: string | number | undefined) => {
         const player = await fetchPlayerDetails(id);
         if (!player) throw new Error("Player not found");
 
-        let boxScoreStats = null;
-        let boxScoreSeasonStats = null;
         const boxScoreSeasonYear =
           ((state.todaysGame as { season?: string } | null | undefined)?.season) ||
           new Date().getFullYear().toString();
  
+        interface PlayerBoxScoreInfo {
+          stats?: {
+            batting?: Record<string, unknown>;
+            pitching?: Record<string, unknown>;
+          };
+          seasonStats?: {
+            batting?: Record<string, unknown>;
+            pitching?: Record<string, unknown>;
+          };
+        }
+
+        let currentBoxScoreStats: BoxScoreStats | undefined;
+        let currentBoxScoreSeasonStats: BoxScoreStats | undefined;
+
         if (boxScore) {
           const players = boxScore.teams?.home?.players || {};
           const awayPlayers = boxScore.teams?.away?.players || {};
           const allPlayers = { ...players, ...awayPlayers };
-          const playerStats = allPlayers[`ID${id}`] as { stats?: { batting?: Record<string, unknown>; pitching?: Record<string, unknown> }; seasonStats?: { batting?: Record<string, unknown>; pitching?: Record<string, unknown> } } | undefined;
+          const playerStats = allPlayers[`ID${id}`] as PlayerBoxScoreInfo | undefined;
 
           if (playerStats) {
-            boxScoreStats = {
-              batting: playerStats?.stats?.batting || {},
-              pitching: playerStats?.stats?.pitching || {},
+            currentBoxScoreStats = {
+              batting: playerStats.stats?.batting || {},
+              pitching: playerStats.stats?.pitching || {},
             };
-            boxScoreSeasonStats = {
+            currentBoxScoreSeasonStats = {
               batting: playerStats.seasonStats?.batting || {},
               pitching: playerStats.seasonStats?.pitching || {},
             };
           }
         }
 
-        const seasonSplit = player.stats?.[0]?.splits?.find(
-          (split: { stat?: { group?: string }; season?: string }) =>
-            split.stat?.group ===
-            (player.primaryPosition?.code === "1" ? "pitching" : "hitting"),
+        const yearStats = player.stats?.find((stat: { 
+          type: { displayName: string }; 
+          group: { displayName: string };
+          splits: Array<{
+            season?: string;
+            stat: Record<string, unknown>;
+          }>;
+        }) => 
+          stat.type.displayName === 'yearByYear' && 
+          stat.group.displayName === (player.primaryPosition?.code === "1" ? "pitching" : "hitting")
+        );
+        const seasonSplit = yearStats?.splits?.find(
+          (split: { season?: string; stat: Record<string, unknown> }) => 
+            split.season === new Date().getFullYear().toString()
         );
         const seasonStats = seasonSplit?.stat || {};
-        const seasonYear =
-          seasonSplit?.season || new Date().getFullYear().toString();
+        const seasonYear = parseInt(seasonSplit?.season || new Date().getFullYear().toString(), 10);
 
         dispatch({
           type: "SET_PLAYER_DATA",
           payload: {
             ...player,
-            boxScoreStats,
-            boxScoreSeasonStats,
+            stats: player.stats || [],
+            boxScoreStats: currentBoxScoreStats,
+            boxScoreSeasonStats: currentBoxScoreSeasonStats,
             boxScoreSeasonYear,
             seasonStats,
             seasonYear,
