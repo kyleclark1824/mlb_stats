@@ -1,43 +1,17 @@
 import { useState, useEffect, useReducer, useCallback } from "react";
-import {fetchTeams, fetchTeamDetails, fetchRoster, fetchSchedule, fetchLastGame, fetchBoxScore, fetchPlayerDetails } from './api'
-import { Game, Roster, TeamRecordData, PlayerDetail, BoxScoreStats } from './types'
-
-// --- Types ---
-type Team = { league?: { id?: number }; [key: string]: unknown };
-
-type BoxScore = {
-  teams?: {
-    home?: { players?: Record<string, unknown> };
-    away?: { players?: Record<string, unknown> };
-  };
-};
-
-type State = {
-  data: Roster;
-  playerInfo: PlayerDetail | null;
-  teamRecord: TeamRecordData | null;
-  todaysGame: Game | null;
-  lastGame: Game | null;
-  boxScore: BoxScore | null;
-  homeTeam: boolean;
-  homeVenueId: number | null;
-  loading: boolean;
-  error: string | null;
-  isFetchingPlayer: boolean;
-};
-
-type Action =
-  | { type: "SET_INITIAL_DATA"; payload: Partial<State> }
-  | { type: "SET_PLAYER_DATA"; payload: PlayerDetail }
-  | { type: "SET_ERROR"; payload: string }
-  | { type: "SET_FETCHING_PLAYER" }
-  | { type: "CLEAR_PLAYER" };
+import { fetchTeams, fetchTeamDetails, fetchRoster, fetchSchedule, fetchLastGame, fetchBoxScore, fetchPlayerDetails } from './api'
+import { 
+  Team, 
+  Player,
+  MLBDataState,
+  MLBDataAction 
+} from './types'
 
 // --- Hooks ---
 
 // useMLBTeams Hook
 export const useMLBTeams = () => {
-  const [teams, setTeams] = useState([]);
+  const [teams, setTeams] = useState<Team[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -47,7 +21,7 @@ export const useMLBTeams = () => {
         const teamsData = await fetchTeams();
         setTeams(
           teamsData.filter(
-            (team: Team) => team.league?.id === 103 || team.league?.id === 104,
+            (team) => team.league?.id === 103 || team.league?.id === 104,
           ),
         );
       } catch (err: unknown) {
@@ -63,8 +37,8 @@ export const useMLBTeams = () => {
 };
 
 // useMLBData Hook
-export const initialState: State = {
-  data: [],
+export const initialState: MLBDataState = {
+  data: null,
   playerInfo: null,
   teamRecord: null,
   todaysGame: null,
@@ -77,12 +51,12 @@ export const initialState: State = {
   isFetchingPlayer: false,
 };
 
-export const reducer = (state: State, action: Action): State => {
+export const reducer = (state: MLBDataState, action: MLBDataAction): MLBDataState => {
   switch (action.type) {
     case "SET_INITIAL_DATA":
-      return { ...state, ...(action.payload || {}), loading: false } as State;
+      return { ...state, ...(action.payload || {}), loading: false };
     case "SET_PLAYER_DATA":
-      return { ...state, playerInfo: action.payload , isFetchingPlayer: false };
+      return { ...state, playerInfo: action.payload, isFetchingPlayer: false };
     case "SET_ERROR":
       return {
         ...state,
@@ -100,8 +74,8 @@ export const reducer = (state: State, action: Action): State => {
 };
 
 export const useMLBData = (teamId: string | number | undefined) => {
-  const [state, dispatch] = useReducer(reducer, initialState as State);
-  const boxScore = (state as State).boxScore as { teams?: { home: { players: Record<string, unknown> }, away: { players: Record<string, unknown> } } } | null;
+  const [state, dispatch] = useReducer(reducer, initialState);
+  const boxScore = state.boxScore;
 
   useEffect(() => {
     if (!teamId) return;
@@ -125,7 +99,7 @@ export const useMLBData = (teamId: string | number | undefined) => {
         const lastGame =
           lastGameResult.status === "fulfilled" ? lastGameResult.value : null;
 
-        const newState: Partial<State> = {
+        const newState: Partial<MLBDataState> = {
           data: roster,
           todaysGame: game,
           lastGame,
@@ -158,10 +132,6 @@ export const useMLBData = (teamId: string | number | undefined) => {
         const player = await fetchPlayerDetails(id);
         if (!player) throw new Error("Player not found");
 
-        const boxScoreSeasonYear =
-          ((state.todaysGame as { season?: string } | null | undefined)?.season) ||
-          new Date().getFullYear().toString();
- 
         interface PlayerBoxScoreInfo {
           stats?: {
             batting?: Record<string, unknown>;
@@ -173,8 +143,15 @@ export const useMLBData = (teamId: string | number | undefined) => {
           };
         }
 
-        let currentBoxScoreStats: BoxScoreStats | undefined;
-        let currentBoxScoreSeasonStats: BoxScoreStats | undefined;
+        // Use the BoxScoreStats type from types.ts
+        let currentBoxScoreStats: {
+          batting?: Record<string, string | number>;
+          pitching?: Record<string, string | number>;
+        } | undefined;
+        let currentBoxScoreSeasonStats: {
+          batting?: Record<string, string | number>;
+          pitching?: Record<string, string | number>;
+        } | undefined;
 
         if (boxScore) {
           const players = boxScore.teams?.home?.players || {};
@@ -184,12 +161,12 @@ export const useMLBData = (teamId: string | number | undefined) => {
 
           if (playerStats) {
             currentBoxScoreStats = {
-              batting: playerStats.stats?.batting || {},
-              pitching: playerStats.stats?.pitching || {},
+              batting: (playerStats.stats?.batting || {}) as Record<string, string | number>,
+              pitching: (playerStats.stats?.pitching || {}) as Record<string, string | number>,
             };
             currentBoxScoreSeasonStats = {
-              batting: playerStats.seasonStats?.batting || {},
-              pitching: playerStats.seasonStats?.pitching || {},
+              batting: (playerStats.seasonStats?.batting || {}) as Record<string, string | number>,
+              pitching: (playerStats.seasonStats?.pitching || {}) as Record<string, string | number>,
             };
           }
         }
@@ -210,25 +187,31 @@ export const useMLBData = (teamId: string | number | undefined) => {
             split.season === new Date().getFullYear().toString()
         );
         const seasonStats = seasonSplit?.stat || {};
-        const seasonYear = parseInt(seasonSplit?.season || new Date().getFullYear().toString(), 10);
 
         dispatch({
           type: "SET_PLAYER_DATA",
           payload: {
-            ...player,
-            stats: player.stats || [],
+            person: {
+              id: player.id,
+              fullName: player.fullName
+            },
+            currentTeam: player.currentTeam,
+            primaryPosition: player.primaryPosition,
             boxScoreStats: currentBoxScoreStats,
             boxScoreSeasonStats: currentBoxScoreSeasonStats,
-            boxScoreSeasonYear,
             seasonStats,
-            seasonYear,
-          },
+            stats: player.stats || [],
+            batSide: player.batSide,
+            pitchHand: player.pitchHand,
+            isPitcher: player.isPitcher,
+            isTwoWayPlayer: player.isTwoWayPlayer
+          } as unknown as Player,
         });
       } catch (err: unknown) {
         dispatch({ type: "SET_ERROR", payload: err instanceof Error ? err.message : String(err) });
       }
     },
-    [boxScore, state.isFetchingPlayer, state.todaysGame],
+    [boxScore, state.isFetchingPlayer],
   );
 
   return {

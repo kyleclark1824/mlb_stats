@@ -98,24 +98,24 @@ export const fetchLastFiveGamesStats = async (teamId: number | string, playerId:
     if (playerStats) {
       if (playerStats.stats?.batting) {
         if (game.lastGame) {
-          lastGameStats.atBats += playerStats.stats.batting.atBats || 0;
-          lastGameStats.hits += playerStats.stats.batting.hits || 0;
-          lastGameStats.homeRuns += playerStats.stats.batting.homeRuns || 0;
-          lastGameStats.rbi += playerStats.stats.batting.rbi || 0;
+          lastGameStats.atBats += Number(playerStats.stats.batting.atBats) || 0;
+          lastGameStats.hits += Number(playerStats.stats.batting.hits) || 0;
+          lastGameStats.homeRuns += Number(playerStats.stats.batting.homeRuns) || 0;
+          lastGameStats.rbi += Number(playerStats.stats.batting.rbi) || 0;
         }
 
-        battingStats.atBats += playerStats.stats.batting.atBats || 0;
-        battingStats.hits += playerStats.stats.batting.hits || 0;
-        battingStats.homeRuns += playerStats.stats.batting.homeRuns || 0;
-        battingStats.rbi += playerStats.stats.batting.rbi || 0;
+        battingStats.atBats += Number(playerStats.stats.batting.atBats) || 0;
+        battingStats.hits += Number(playerStats.stats.batting.hits) || 0;
+        battingStats.homeRuns += Number(playerStats.stats.batting.homeRuns) || 0;
+        battingStats.rbi += Number(playerStats.stats.batting.rbi) || 0;
       }
       if (playerStats.stats?.pitching) {
         pitchingStats.inningsPitched += parseFloat(
-          playerStats.stats.pitching.inningsPitched || "0",
+          String(playerStats.stats.pitching.inningsPitched || "0")
         );
-        pitchingStats.strikeOuts += playerStats.stats.pitching.strikeOuts || 0;
-        pitchingStats.hits += playerStats.stats.pitching.hits || 0;
-        pitchingStats.earnedRuns += playerStats.stats.pitching.earnedRuns || 0;
+        pitchingStats.strikeOuts += Number(playerStats.stats.pitching.strikeOuts) || 0;
+        pitchingStats.hits += Number(playerStats.stats.pitching.hits) || 0;
+        pitchingStats.earnedRuns += Number(playerStats.stats.pitching.earnedRuns) || 0;
       }
     }
   }

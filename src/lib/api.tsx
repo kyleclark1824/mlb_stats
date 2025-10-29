@@ -1,41 +1,52 @@
 // --- API Utilities ---
+import { 
+  TeamsResponse, 
+  TeamResponse, 
+  RosterResponse, 
+  ScheduleResponse, 
+  BoxScoreResponse, 
+  Team,
+  Player,
+  Game
+} from './types';
+
 export const apiHost =
   process.env.NEXT_PUBLIC_MLB_API_HOST || "https://statsapi.mlb.com/api/v1";
 
-export const fetchTeams = async () => {
+export const fetchTeams = async (): Promise<Team[]> => {
   const response = await fetch(`${apiHost}/teams?sportId=1`);
   if (!response.ok) throw new Error("Failed to fetch teams");
-  const data = await response.json();
+  const data = await response.json() as TeamsResponse;
   return data.teams || [];
 };
 
-export const fetchTeamDetails = async (teamId: string | number) => {
+export const fetchTeamDetails = async (teamId: string | number): Promise<Team> => {
   const response = await fetch(`${apiHost}/teams/${teamId}`);
   if (!response.ok) throw new Error("Failed to fetch team details");
-  const data = await response.json();
+  const data = await response.json() as TeamResponse;
   return data.teams?.[0] || {};
 };
 
-export const fetchRoster = async (teamId: string | number) => {
+export const fetchRoster = async (teamId: string | number): Promise<Player[]> => {
   const response = await fetch(`${apiHost}/teams/${teamId}/roster`);
   if (!response.ok) throw new Error("Failed to fetch roster");
-  const { roster } = await response.json();
-  return roster || [];
+  const data = await response.json() as RosterResponse;
+  return data.roster || [];
 };
 
-export const fetchSchedule = async (teamId: string | number) => {
+export const fetchSchedule = async (teamId: string | number): Promise<Game | null> => {
   const response = await fetch(
     `${apiHost}/schedule?sportId=1&teamId=${teamId}`,
   );
   if (!response.ok) throw new Error("Failed to fetch schedule");
-  const { dates } = await response.json();
-  return dates?.[0]?.games?.[0] || null;
+  const data = await response.json() as ScheduleResponse;
+  return data.dates?.[0]?.games?.[0] || null;
 };
 
-export const fetchBoxScore = async (gamePk: string | number) => {
+export const fetchBoxScore = async (gamePk: string | number): Promise<BoxScoreResponse> => {
   const response = await fetch(`${apiHost}/game/${gamePk}/boxscore`);
   if (!response.ok) throw new Error("Failed to fetch box score");
-  return await response.json();
+  return await response.json() as BoxScoreResponse;
 };
 
 export const fetchPlayerDetails = async (playerId: string | number) => {

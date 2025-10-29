@@ -1,25 +1,42 @@
 export const fetchPlayerStatsByYear = async (playerId: number | string, year: number) => {
   try {
-    const response = await fetch(
-      `${process.env.NEXT_PUBLIC_MLB_API_HOST || 'https://statsapi.mlb.com/api/v1'}/people/${playerId}?hydrate=stats(group=[hitting,pitching],type=[yearByYear])`
-    );
+    const url = `${process.env.NEXT_PUBLIC_MLB_API_HOST || 'https://statsapi.mlb.com/api/v1'}/people/${playerId}?hydrate=stats(group=[hitting,pitching],type=[yearByYear])`;
+
+    
+    const response = await fetch(url);
     
     if (!response.ok) {
-      throw new Error(`Failed to fetch stats: ${response.statusText}`);
+      const error = `Failed to fetch stats: ${response.statusText}`;
+      console.error(error);
+      throw new Error(error);
     }
 
     const data = await response.json();
     const player = data.people?.[0];
-    const isPitcher = player?.primaryPosition?.code === "1";
+    if (!player) {
+      throw new Error('Player not found');
+    }
 
-    const yearByYearStats = data.people?.[0]?.stats?.find(
-      (stat: { type: { displayName: string }; group: { displayName: string } }) => stat.type.displayName === 'yearByYear' && 
-      stat.group.displayName === (isPitcher ? 'pitching' : 'hitting')
+    const isPitcher = player.primaryPosition?.code === "1";
+
+    const yearByYearStats = player.stats?.find(
+      (stat: { type: { displayName: string }; group: { displayName: string } }) => 
+        stat.type.displayName === 'yearByYear' && 
+        stat.group.displayName === (isPitcher ? 'pitching' : 'hitting')
     );
 
-    const seasonStats = yearByYearStats?.splits?.find(
+    if (!yearByYearStats?.splits?.length) {
+      return null;
+    }
+
+
+    const seasonStats = yearByYearStats.splits.find(
       (split: { season?: string }) => split.season === year.toString()
     );
+    
+    if (!seasonStats) {
+      return null;
+    }
 
     if (!seasonStats) {
       return null;

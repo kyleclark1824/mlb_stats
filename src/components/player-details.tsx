@@ -3,10 +3,21 @@ import { useState, useEffect } from "react";
 import { fetchLastFiveGamesStats } from "../lib/util";
 import { fetchPlayerStatsByYear } from "../lib/player-stats";
 import Image from "next/image";
+import { SeasonStats } from "../lib/types";
 
 // ===== TYPES =====
-import { PlayerDetail } from "../lib/types";
-
+interface YearStat {
+  type: {
+    displayName: string;
+  };
+  group: {
+    displayName: string;
+  };
+  splits: Array<{
+    season?: string;
+    stat: Record<string, unknown>;
+  }>;
+}
 
 interface LastFiveGamesStats {
   gamesCount: number;
@@ -24,7 +35,57 @@ interface LastFiveGamesStats {
   };
 }
 
-type PlayerInfo = PlayerDetail;
+interface PlayerInfo {
+  person: {
+    id: number;
+    fullName: string;
+    firstName?: string;
+    lastName?: string;
+    primaryNumber?: string;
+    birthDate?: string;
+    currentAge?: number;
+    birthCity?: string;
+    birthStateProvince?: string;
+    birthCountry?: string;
+  };
+  stats?: Array<{
+    type: { displayName: string };
+    group: { displayName: string };
+    splits: Array<{
+      season?: string;
+      stat: Record<string, unknown>;
+    }>;
+  }>;
+  currentTeam?: {
+    id: number | string;
+    name: string;
+  };
+  primaryPosition?: {
+    name: string;
+    code: string;
+    type: string;
+    abbreviation: string;
+  };
+  batSide?: string;
+  pitchHand?: string;
+  isPitcher?: boolean;
+  isTwoWayPlayer?: boolean;
+  seasonStats?: SeasonStats;
+  lastGameStats?: {
+    batting?: {
+      atBats: number;
+      hits: number;
+      homeRuns: number;
+      rbi: number;
+    };
+    pitching?: {
+      inningsPitched: string;
+      strikeOuts: number;
+      hits: number;
+      earnedRuns: number;
+    };
+  };
+}
 
 interface PlayerDetailsProps {
   playerInfo: PlayerInfo;
@@ -73,7 +134,7 @@ export const PlayerDetails: React.FC<PlayerDetailsProps> = ({
   const [loadingYearStats, setLoadingYearStats] = useState<boolean>(false);
   const [yearOptions, setYearOptions] = useState<number[]>([]);
 
-  const headshotUrl = `https://content.mlb.com/images/headshots/current/60x60/${playerInfo?.id}@2x.png`;
+  const headshotUrl = `https://content.mlb.com/images/headshots/current/60x60/${playerInfo.person?.id}@2x.png`;
   const fallbackImage = "/mlb-logo.svg";
 
   // Fetch last 5 games stats when component mounts
@@ -83,7 +144,7 @@ export const PlayerDetails: React.FC<PlayerDetailsProps> = ({
       try {
         const stats = await fetchLastFiveGamesStats(
           playerInfo.currentTeam?.id ?? "",
-          playerInfo?.id ?? 0
+          playerInfo.person?.id ?? 0
         );
         setLastFiveGamesStats(stats);
       } catch (err: unknown) {
@@ -93,21 +154,21 @@ export const PlayerDetails: React.FC<PlayerDetailsProps> = ({
       }
     };
     fetchStatsAsync();
-  }, [playerInfo?.id, playerInfo.currentTeam?.id]);
+  }, [playerInfo.person?.id, playerInfo.currentTeam?.id]);
 
   // Populate year options when player info changes
   useEffect(() => {
     if (playerInfo.stats) {
-      const yearStats = playerInfo.stats.find(stat => 
+      const yearStats = playerInfo.stats.find((stat: YearStat) =>
         stat.type.displayName === 'yearByYear' &&
         stat.group.displayName === (playerInfo.isPitcher ? 'pitching' : 'hitting')
       );
       
       const years = yearStats?.splits
-        ?.map(split => parseInt(split.season || '', 10))
-        .filter(year => !isNaN(year))
-        .sort((a, b) => b - a) || [];
-
+        ?.map((split: { season?: string }) => parseInt(split.season || '', 10))
+        .filter((year: number) => !isNaN(year))
+        .sort((a: number, b: number) => b - a) || [];
+      
       setYearOptions(years);
       
       // Set initial year to most recent
@@ -115,26 +176,35 @@ export const PlayerDetails: React.FC<PlayerDetailsProps> = ({
         setSelectedYear(years[0]);
       }
     }
-  }, [playerInfo.stats, playerInfo.isPitcher]);
+  }, [playerInfo.stats, playerInfo.isPitcher, selectedYear]);
 
   // Fetch stats for selected year when it changes
   useEffect(() => {
     const fetchYearStats = async () => {
-      if (!playerInfo.id || !selectedYear) return;
+      console.log('Full playerInfo:', playerInfo);
+      const playerId = playerInfo.person?.id;
+      console.log('fetchYearStats called with:', { playerId, selectedYear });
+      if (!playerId || !selectedYear) {
+        console.log('Missing required data:', { playerId, playerInfo, selectedYear });
+        return;
+      }
       
       setLoadingYearStats(true);
       try {
-        const stats = await fetchPlayerStatsByYear(playerInfo.id, selectedYear);
+        console.log('Fetching stats for year:', selectedYear);
+        const stats = await fetchPlayerStatsByYear(playerId, selectedYear);
+        console.log('Received stats:', stats);
         setYearStats(stats);
       } catch (error) {
         console.error('Error fetching year stats:', error);
+        setYearStats(null);
       } finally {
         setLoadingYearStats(false);
       }
     };
 
     fetchYearStats();
-  }, [playerInfo.id, selectedYear]);
+  }, [playerInfo, selectedYear]);
 
   return (
     <div className="bg-white dark:bg-gray-800 shadow-lg rounded-lg p-6 mb-12 text-black dark:text-white">
@@ -147,7 +217,7 @@ export const PlayerDetails: React.FC<PlayerDetailsProps> = ({
         <div className="relative mb-4 sm:mb-0 sm:mr-6">
           <Image
             src={imageError ? fallbackImage : headshotUrl}
-            alt={`${playerInfo.fullName} headshot`}
+            alt={`${playerInfo.person?.fullName} headshot`}
             width={150}
             height={150}
             className="rounded-full object-cover border-2 border-gray-300 dark:border-gray-600"
@@ -158,7 +228,7 @@ export const PlayerDetails: React.FC<PlayerDetailsProps> = ({
         </div>
         <div>
           <p className="text-xl font-bold text-navy-800 dark:text-white">
-            {playerInfo.fullName}
+            {playerInfo.person?.fullName}
           </p>
           <p className="text-gray-600 dark:text-gray-300">
             Position: {playerInfo.primaryPosition?.name || "N/A"}
@@ -190,8 +260,14 @@ export const PlayerDetails: React.FC<PlayerDetailsProps> = ({
             </label>
             <select
               id="yearSelect"
-              value={selectedYear}
-              onChange={(e) => setSelectedYear(Number(e.target.value))}
+              value={selectedYear || ''}
+              onChange={(e) => {
+                const newYear = Number(e.target.value);
+                if (!isNaN(newYear) && newYear > 0) {
+                  console.log('Year selected:', newYear);
+                  setSelectedYear(newYear);
+                }
+              }}
               className="bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded px-2 py-1 text-sm"
             >
               {yearOptions.map(year => (
