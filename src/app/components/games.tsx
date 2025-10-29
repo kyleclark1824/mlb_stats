@@ -1,9 +1,39 @@
+import React from "react";
+
+interface TeamInfo {
+  name: string;
+}
+
+interface Team {
+  team: TeamInfo;
+  score?: number;
+}
+
+interface Teams {
+  home: Team;
+  away: Team;
+}
+
+interface Venue {
+  name?: string;
+}
+
+export interface Game {
+  gameDate: string;
+  venue?: Venue;
+  teams: Teams;
+}
+
+interface GameProps {
+  game?: Game | null;
+}
+
 // TodaysGame Component
-export const TodaysGame = ({ game }) =>
+export const TodaysGame: React.FC<GameProps> = ({ game }) =>
   game ? (
     <div className="bg-white dark:bg-gray-800 shadow-lg rounded-lg p-6">
       <h2 className="text-2xl font-semibold text-red-700 dark:text-red-300 mb-4">
-        Today's Game
+        Today&apos;s Game
       </h2>
       <p className="text-gray-600 dark:text-gray-300">
         {new Date(game.gameDate).toLocaleString("en-US", {
@@ -15,16 +45,14 @@ export const TodaysGame = ({ game }) =>
           timeZoneName: "short",
         })}
       </p>
-      <p className="text-gray-600 dark:text-gray-300 mb-4">
-        @{game.venue?.name}
-      </p>
+      <p className="text-gray-600 dark:text-gray-300 mb-4">@{game.venue?.name}</p>
       <div className="flex justify-between">
         <div>
           <p className="text-gray-600 dark:text-gray-300">
             {game.teams.home.team.name}
           </p>
           <p className="text-xl font-bold text-navy-800 dark:text-white">
-            {game.teams.home.score || 0}
+            {game.teams.home.score ?? 0}
           </p>
         </div>
         <div>
@@ -32,7 +60,7 @@ export const TodaysGame = ({ game }) =>
             {game.teams.away.team.name}
           </p>
           <p className="text-xl font-bold text-navy-800 dark:text-white">
-            {game.teams.away.score || 0}
+            {game.teams.away.score ?? 0}
           </p>
         </div>
       </div>
@@ -40,7 +68,7 @@ export const TodaysGame = ({ game }) =>
   ) : (
     <div className="bg-white dark:bg-gray-800 shadow-lg rounded-lg p-6">
       <h2 className="text-2xl font-semibold text-red-700 dark:text-red-300 mb-4">
-        Today's Game
+        Today&apos;s Game
       </h2>
       <p className="text-gray-600 dark:text-gray-300">
         No game scheduled today.
@@ -49,7 +77,7 @@ export const TodaysGame = ({ game }) =>
   );
 
 // LastGame Component
-export const LastGame = ({ game }) =>
+export const LastGame: React.FC<GameProps> = ({ game }) =>
   game ? (
     <div className="bg-white dark:bg-gray-800 shadow-lg rounded-lg p-6">
       <h2 className="text-2xl font-semibold text-red-700 dark:text-red-300 mb-4">
@@ -63,16 +91,14 @@ export const LastGame = ({ game }) =>
           year: "numeric",
         })}
       </p>
-      <p className="text-gray-600 dark:text-gray-300 mb-4">
-        @{game.venue?.name}
-      </p>
+      <p className="text-gray-600 dark:text-gray-300 mb-4">@{game.venue?.name}</p>
       <div className="flex justify-between">
         <div>
           <p className="text-gray-600 dark:text-gray-300">
             {game.teams.home.team.name}
           </p>
           <p className="text-xl font-bold text-navy-800 dark:text-white">
-            {game.teams.home.score || 0}
+            {game.teams.home.score ?? 0}
           </p>
         </div>
         <div>
@@ -80,7 +106,7 @@ export const LastGame = ({ game }) =>
             {game.teams.away.team.name}
           </p>
           <p className="text-xl font-bold text-navy-800 dark:text-white">
-            {game.teams.away.score || 0}
+            {game.teams.away.score ?? 0}
           </p>
         </div>
       </div>

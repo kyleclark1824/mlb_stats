@@ -1,34 +1,66 @@
+"use client";
 import { useState, useEffect } from "react";
-import { debounce } from "../lib/util.tsx"
-import { fetchLastFiveGamesStats, fetchStats } from "../lib/util.tsx"
+import { fetchLastFiveGamesStats } from "../lib/util";
 import Image from "next/image";
 
-  // PlayerDetails Component
-export const PlayerDetails = ({ playerInfo, onClose }) => {
-  const [imageError, setImageError] = useState(false);
-  const [lastFiveGamesStats, setLastFiveGamesStats] = useState(null);
-  const [loadingLastFive, setLoadingLastFive] = useState(false);
-  const [errorLastFive, setErrorLastFive] = useState(null);
+// ===== TYPES =====
+import { PlayerDetail } from "../lib/types";
 
-  // Construct the headshot URL
+
+interface LastFiveGamesStats {
+  gamesCount: number;
+  battingStats?: {
+    atBats: number;
+    hits: number;
+    homeRuns: number;
+    rbi: number;
+  };
+  pitchingStats?: {
+    inningsPitched: number;
+    strikeOuts: number;
+    hits: number;
+    earnedRuns: number;
+  };
+}
+
+type PlayerInfo = PlayerDetail;
+
+interface PlayerDetailsProps {
+  playerInfo: PlayerInfo;
+  onClose: () => void;
+}
+
+// ===== COMPONENT =====
+export const PlayerDetails: React.FC<PlayerDetailsProps> = ({
+  playerInfo,
+  onClose,
+}) => {
+  const [imageError, setImageError] = useState<boolean>(false);
+  const [lastFiveGamesStats, setLastFiveGamesStats] =
+    useState<LastFiveGamesStats | null>(null);
+  const [loadingLastFive, setLoadingLastFive] = useState<boolean>(false);
+  const [errorLastFive, setErrorLastFive] = useState<string | null>(null);
+
   const headshotUrl = `https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:headshot:67:current.jpg/w_213,q_auto:best/v1/people/${playerInfo?.id}/headshot/67/current`;
-  // Fallback image (place in /public directory)
   const fallbackImage = "/default-player.png";
 
   // Fetch last 5 games stats when component mounts
   useEffect(() => {
-    const fetchStats = async () => {
+    const fetchStatsAsync = async () => {
       setLoadingLastFive(true);
       try {
-        const stats = await fetchLastFiveGamesStats(playerInfo.currentTeam?.id, playerInfo?.id);
+        const stats = await fetchLastFiveGamesStats(
+          playerInfo.currentTeam?.id ?? "",
+          playerInfo?.id ?? 0
+        );
         setLastFiveGamesStats(stats);
-      } catch (err) {
-        setErrorLastFive(err.message);
+      } catch (err: unknown) {
+        setErrorLastFive(err instanceof Error ? err.message : String(err));
       } finally {
         setLoadingLastFive(false);
       }
     };
-    fetchStats();
+    fetchStatsAsync();
   }, [playerInfo?.id, playerInfo.currentTeam?.id]);
 
   return (
@@ -36,6 +68,8 @@ export const PlayerDetails = ({ playerInfo, onClose }) => {
       <h2 className="text-2xl font-semibold text-red-700 dark:text-red-300 mb-4">
         Player Details
       </h2>
+
+      {/* Player Info */}
       <div className="flex flex-col sm:flex-row sm:items-start mb-6">
         <div className="mb-4 sm:mb-0 sm:mr-6">
           <Image
@@ -60,140 +94,61 @@ export const PlayerDetails = ({ playerInfo, onClose }) => {
         </div>
       </div>
 
-      {/* Season Stats */}
+      {/* ===== SEASON STATS ===== */}
       {playerInfo.seasonStats &&
         Object.keys(playerInfo.seasonStats).length > 0 && (
           <div className="mb-4">
             <h3 className="text-lg font-semibold text-navy-800 dark:text-white mb-2">
               {playerInfo.seasonYear} Season Stats
             </h3>
+
+            {/* Pitchers */}
             {playerInfo.primaryPosition?.code === "1" ? (
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                <div>
-                  <p className="text-gray-600 dark:text-gray-300">
-                    Innings Pitched
-                  </p>
-                  <p className="font-bold">
-                    {playerInfo.seasonStats.inningsPitched || "0.0"}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-gray-600 dark:text-gray-300">Strikeouts</p>
-                  <p className="font-bold">
-                    {playerInfo.seasonStats.strikeOuts || 0}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-gray-600 dark:text-gray-300">ERA</p>
-                  <p className="font-bold">
-                    {playerInfo.seasonStats.era || "0.00"}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-gray-600 dark:text-gray-300">Wins</p>
-                  <p className="font-bold">{playerInfo.seasonStats.wins || 0}</p>
-                </div>
+                <Stat label="Innings Pitched" value={playerInfo.seasonStats.inningsPitched || "0.0"} />
+                <Stat label="Strikeouts" value={playerInfo.seasonStats.strikeOuts || 0} />
+                <Stat label="ERA" value={playerInfo.seasonStats.era || "0.00"} />
+                <Stat label="Wins" value={playerInfo.seasonStats.wins || 0} />
               </div>
             ) : (
+              // Hitters
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                <div>
-                  <p className="text-gray-600 dark:text-gray-300">Batting Avg</p>
-                  <p className="font-bold">
-                    {playerInfo.seasonStats.avg || ".000"}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-gray-600 dark:text-gray-300">Home Runs</p>
-                  <p className="font-bold">
-                    {playerInfo.seasonStats.homeRuns || 0}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-gray-600 dark:text-gray-300">RBIs</p>
-                  <p className="font-bold">{playerInfo.seasonStats.rbi || 0}</p>
-                </div>
-                <div>
-                  <p className="text-gray-600 dark:text-gray-300">Hits</p>
-                  <p className="font-bold">{playerInfo.seasonStats.hits || 0}</p>
-                </div>
+                <Stat label="Batting Avg" value={playerInfo.seasonStats.avg || ".000"} />
+                <Stat label="Home Runs" value={playerInfo.seasonStats.homeRuns || 0} />
+                <Stat label="RBIs" value={playerInfo.seasonStats.rbi || 0} />
+                <Stat label="Hits" value={playerInfo.seasonStats.hits || 0} />
               </div>
             )}
           </div>
         )}
 
-      {/* Last Game Stats */}
+      {/* ===== LAST GAME STATS ===== */}
       {playerInfo.lastGameStats ? (
         <div className="mb-4">
           <h3 className="text-lg font-semibold text-navy-800 dark:text-white mb-2">
             Last Game Stats
           </h3>
+
+          {/* Batting */}
           {playerInfo.lastGameStats.batting &&
             Object.keys(playerInfo.lastGameStats.batting).length > 0 && (
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                <div>
-                  <p className="text-gray-600 dark:text-gray-300">At Bats</p>
-                  <p className="font-bold">
-                    {playerInfo.lastGameStats.batting.atBats || 0}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-gray-600 dark:text-gray-300">Hits</p>
-                  <p className="font-bold">
-                    {playerInfo.lastGameStats.batting.hits || 0}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-gray-600 dark:text-gray-300">Home Runs</p>
-                  <p className="font-bold">
-                    {playerInfo.lastGameStats.batting.homeRuns || 0}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-gray-600 dark:text-gray-300">RBIs</p>
-                  <p className="font-bold">
-                    {playerInfo.lastGameStats.batting.rbi || 0}
-                  </p>
-                </div>
+                <Stat label="At Bats" value={playerInfo.lastGameStats.batting.atBats || 0} />
+                <Stat label="Hits" value={playerInfo.lastGameStats.batting.hits || 0} />
+                <Stat label="Home Runs" value={playerInfo.lastGameStats.batting.homeRuns || 0} />
+                <Stat label="RBIs" value={playerInfo.lastGameStats.batting.rbi || 0} />
               </div>
             )}
+
+          {/* Pitching */}
           {playerInfo.lastGameStats.pitching &&
             Object.keys(playerInfo.lastGameStats.pitching).length > 0 && (
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-4">
-                <div>
-                  <p className="text-gray-600 dark:text-gray-300">
-                    Innings Pitched
-                  </p>
-                  <p className="font-bold">
-                    {playerInfo.lastGameStats.pitching.inningsPitched || "0.0"}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-gray-600 dark:text-gray-300">Strikeouts</p>
-                  <p className="font-bold">
-                    {playerInfo.lastGameStats.pitching.strikeOuts || 0}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-gray-600 dark:text-gray-300">Hits Allowed</p>
-                  <p className="font-bold">
-                    {playerInfo.lastGameStats.pitching.hits || 0}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-gray-600 dark:text-gray-300">Earned Runs</p>
-                  <p className="font-bold">
-                    {playerInfo.lastGameStats.pitching.earnedRuns || 0}
-                  </p>
-                </div>
+                <Stat label="Innings Pitched" value={playerInfo.lastGameStats.pitching.inningsPitched || "0.0"} />
+                <Stat label="Strikeouts" value={playerInfo.lastGameStats.pitching.strikeOuts || 0} />
+                <Stat label="Hits Allowed" value={playerInfo.lastGameStats.pitching.hits || 0} />
+                <Stat label="Earned Runs" value={playerInfo.lastGameStats.pitching.earnedRuns || 0} />
               </div>
-            )}
-          {(!playerInfo.lastGameStats.batting ||
-            Object.keys(playerInfo.boxScoreStats.batting).length === 0) &&
-            (!playerInfo.lastGameStats.pitching ||
-              Object.keys(playerInfo.lastGameStats.pitching).length === 0) && (
-              <p className="text-gray-600 dark:text-gray-300">
-                No stats available for the last game.
-              </p>
             )}
         </div>
       ) : (
@@ -207,7 +162,7 @@ export const PlayerDetails = ({ playerInfo, onClose }) => {
         </div>
       )}
 
-      {/* Last 5 Games Stats */}
+      {/* ===== LAST 5 GAMES ===== */}
       <div className="mb-4">
         <h3 className="text-lg font-semibold text-navy-800 dark:text-white mb-2">
           Last 5 Games Stats
@@ -215,83 +170,28 @@ export const PlayerDetails = ({ playerInfo, onClose }) => {
         {loadingLastFive ? (
           <p className="text-gray-600 dark:text-gray-300">Loading...</p>
         ) : errorLastFive ? (
-          <p className="text-red-700 dark:text-red-300">
-            Error: {errorLastFive}
-          </p>
+          <p className="text-red-700 dark:text-red-300">Error: {errorLastFive}</p>
         ) : lastFiveGamesStats && lastFiveGamesStats.gamesCount > 0 ? (
           <>
-            {lastFiveGamesStats.battingStats &&
-              (lastFiveGamesStats.battingStats.atBats > 0 ||
-                lastFiveGamesStats.battingStats.hits > 0) && (
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                  <div>
-                    <p className="text-gray-600 dark:text-gray-300">At Bats</p>
-                    <p className="font-bold">
-                      {lastFiveGamesStats.battingStats.atBats}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-gray-600 dark:text-gray-300">Hits</p>
-                    <p className="font-bold">
-                      {lastFiveGamesStats.battingStats.hits}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-gray-600 dark:text-gray-300">Home Runs</p>
-                    <p className="font-bold">
-                      {lastFiveGamesStats.battingStats.homeRuns}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-gray-600 dark:text-gray-300">RBIs</p>
-                    <p className="font-bold">
-                      {lastFiveGamesStats.battingStats.rbi}
-                    </p>
-                  </div>
-                </div>
-              )}
-            {lastFiveGamesStats.pitchingStats &&
-              (lastFiveGamesStats.pitchingStats.inningsPitched > 0 ||
-                lastFiveGamesStats.pitchingStats.strikeOuts > 0) && (
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-4">
-                  <div>
-                    <p className="text-gray-600 dark:text-gray-300">
-                      Innings Pitched
-                    </p>
-                    <p className="font-bold">
-                      {lastFiveGamesStats.pitchingStats.inningsPitched.toFixed(1)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-gray-600 dark:text-gray-300">Strikeouts</p>
-                    <p className="font-bold">
-                      {lastFiveGamesStats.pitchingStats.strikeOuts}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-gray-600 dark:text-gray-300">Hits Allowed</p>
-                    <p className="font-bold">
-                      {lastFiveGamesStats.pitchingStats.hits}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-gray-600 dark:text-gray-300">Earned Runs</p>
-                    <p className="font-bold">
-                      {lastFiveGamesStats.pitchingStats.earnedRuns}
-                    </p>
-                  </div>
-                </div>
-              )}
-            {(!lastFiveGamesStats.battingStats ||
-              (lastFiveGamesStats.battingStats.atBats === 0 &&
-                lastFiveGamesStats.battingStats.hits === 0)) &&
-              (!lastFiveGamesStats.pitchingStats ||
-                (lastFiveGamesStats.pitchingStats.inningsPitched === 0 &&
-                  lastFiveGamesStats.pitchingStats.strikeOuts === 0)) && (
-                <p className="text-gray-600 dark:text-gray-300">
-                  No stats available for the last {lastFiveGamesStats.gamesCount} games.
-                </p>
-              )}
+            {/* Batting */}
+            {lastFiveGamesStats.battingStats && (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <Stat label="At Bats" value={lastFiveGamesStats.battingStats.atBats} />
+                <Stat label="Hits" value={lastFiveGamesStats.battingStats.hits} />
+                <Stat label="Home Runs" value={lastFiveGamesStats.battingStats.homeRuns} />
+                <Stat label="RBIs" value={lastFiveGamesStats.battingStats.rbi} />
+              </div>
+            )}
+
+            {/* Pitching */}
+            {lastFiveGamesStats.pitchingStats && (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-4">
+                <Stat label="Innings Pitched" value={lastFiveGamesStats.pitchingStats.inningsPitched.toFixed(1)} />
+                <Stat label="Strikeouts" value={lastFiveGamesStats.pitchingStats.strikeOuts} />
+                <Stat label="Hits Allowed" value={lastFiveGamesStats.pitchingStats.hits} />
+                <Stat label="Earned Runs" value={lastFiveGamesStats.pitchingStats.earnedRuns} />
+              </div>
+            )}
           </>
         ) : (
           <p className="text-gray-600 dark:text-gray-300">
@@ -300,6 +200,7 @@ export const PlayerDetails = ({ playerInfo, onClose }) => {
         )}
       </div>
 
+      {/* ===== CLOSE BUTTON ===== */}
       <button
         onClick={onClose}
         className="mt-6 bg-red-700 dark:bg-red-600 text-white px-4 py-2 rounded hover:bg-red-800 dark:hover:bg-red-700 transition"
@@ -309,3 +210,16 @@ export const PlayerDetails = ({ playerInfo, onClose }) => {
     </div>
   );
 };
+
+// ===== SMALL REUSABLE STAT COMPONENT =====
+interface StatProps {
+  label: string;
+  value: string | number;
+}
+
+const Stat: React.FC<StatProps> = ({ label, value }) => (
+  <div>
+    <p className="text-gray-600 dark:text-gray-300">{label}</p>
+    <p className="font-bold">{value}</p>
+  </div>
+);

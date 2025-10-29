@@ -1,5 +1,37 @@
-import React, { useState, useEffect, useReducer, useMemo, useCallback } from "react";
-import {fetchTeams, fetchTeamsData, fetchTeamDetails, fetchRoster, fetchSchedule, fetchLastGame, fetchBoxScore, fetchPlayerDetails } from './api.tsx'
+import { useState, useEffect, useReducer, useCallback } from "react";
+import {fetchTeams, fetchTeamDetails, fetchRoster, fetchSchedule, fetchLastGame, fetchBoxScore, fetchPlayerDetails } from './api'
+import { Game, Roster, TeamRecordData, PlayerDetail } from './types'
+
+// --- Types ---
+type Team = { league?: { id?: number }; [key: string]: unknown };
+
+type BoxScore = {
+  teams?: {
+    home?: { players?: Record<string, unknown> };
+    away?: { players?: Record<string, unknown> };
+  };
+};
+
+type State = {
+  data: Roster;
+  playerInfo: PlayerDetail | null;
+  teamRecord: TeamRecordData | null;
+  todaysGame: Game | null;
+  lastGame: Game | null;
+  boxScore: BoxScore | null;
+  homeTeam: boolean;
+  homeVenueId: number | null;
+  loading: boolean;
+  error: string | null;
+  isFetchingPlayer: boolean;
+};
+
+type Action =
+  | { type: "SET_INITIAL_DATA"; payload: Partial<State> }
+  | { type: "SET_PLAYER_DATA"; payload: PlayerDetail }
+  | { type: "SET_ERROR"; payload: string }
+  | { type: "SET_FETCHING_PLAYER" }
+  | { type: "CLEAR_PLAYER" };
 
 // --- Hooks ---
 
@@ -7,7 +39,7 @@ import {fetchTeams, fetchTeamsData, fetchTeamDetails, fetchRoster, fetchSchedule
 export const useMLBTeams = () => {
   const [teams, setTeams] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchTeamsData = async () => {
@@ -15,11 +47,11 @@ export const useMLBTeams = () => {
         const teamsData = await fetchTeams();
         setTeams(
           teamsData.filter(
-            (team) => team.league?.id === 103 || team.league?.id === 104,
+            (team: Team) => team.league?.id === 103 || team.league?.id === 104,
           ),
         );
-      } catch (err) {
-        setError(err.message);
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : String(err));
       } finally {
         setLoading(false);
       }
@@ -31,7 +63,7 @@ export const useMLBTeams = () => {
 };
 
 // useMLBData Hook
-export const initialState = {
+export const initialState: State = {
   data: [],
   playerInfo: null,
   teamRecord: null,
@@ -45,12 +77,12 @@ export const initialState = {
   isFetchingPlayer: false,
 };
 
-export const reducer = (state, action) => {
+export const reducer = (state: State, action: Action): State => {
   switch (action.type) {
     case "SET_INITIAL_DATA":
-      return { ...state, ...action.payload, loading: false };
+      return { ...state, ...(action.payload || {}), loading: false } as State;
     case "SET_PLAYER_DATA":
-      return { ...state, playerInfo: action.payload, isFetchingPlayer: false };
+      return { ...state, playerInfo: action.payload , isFetchingPlayer: false };
     case "SET_ERROR":
       return {
         ...state,
@@ -67,9 +99,9 @@ export const reducer = (state, action) => {
   }
 };
 
-export const useMLBData = (teamId) => {
-  const [state, dispatch] = useReducer(reducer, initialState);
-  const boxScore = useMemo(() => state.boxScore, [state.boxScore]);
+export const useMLBData = (teamId: string | number | undefined) => {
+  const [state, dispatch] = useReducer(reducer, initialState as State);
+  const boxScore = (state as State).boxScore as { teams?: { home: { players: Record<string, unknown> }, away: { players: Record<string, unknown> } } } | null;
 
   useEffect(() => {
     if (!teamId) return;
@@ -93,7 +125,7 @@ export const useMLBData = (teamId) => {
         const lastGame =
           lastGameResult.status === "fulfilled" ? lastGameResult.value : null;
 
-        const newState = {
+        const newState: Partial<State> = {
           data: roster,
           todaysGame: game,
           lastGame,
@@ -111,15 +143,15 @@ export const useMLBData = (teamId) => {
         }
         console.log("setting", newState);
         dispatch({ type: "SET_INITIAL_DATA", payload: newState });
-      } catch (err) {
-        dispatch({ type: "SET_ERROR", payload: err.message });
+      } catch (err: unknown) {
+        dispatch({ type: "SET_ERROR", payload: err instanceof Error ? err.message : String(err) });
       }
     };
     fetchData();
   }, [teamId]);
 
   const fetchPlayerData = useCallback(
-    async (id) => {
+    async (id: string | number) => {
       if (state.isFetchingPlayer) return;
       dispatch({ type: "SET_FETCHING_PLAYER" });
       try {
@@ -128,19 +160,20 @@ export const useMLBData = (teamId) => {
 
         let boxScoreStats = null;
         let boxScoreSeasonStats = null;
-        let boxScoreSeasonYear =
-          state.todaysGame?.season || new Date().getFullYear().toString();
-        console.log("here", boxScore);
+        const boxScoreSeasonYear =
+          ((state.todaysGame as { season?: string } | null | undefined)?.season) ||
+          new Date().getFullYear().toString();
+ 
         if (boxScore) {
           const players = boxScore.teams?.home?.players || {};
           const awayPlayers = boxScore.teams?.away?.players || {};
           const allPlayers = { ...players, ...awayPlayers };
-          const playerStats = allPlayers[`ID${id}`];
-          console.log(allPlayers, id);
+          const playerStats = allPlayers[`ID${id}`] as { stats?: { batting?: Record<string, unknown>; pitching?: Record<string, unknown> }; seasonStats?: { batting?: Record<string, unknown>; pitching?: Record<string, unknown> } } | undefined;
+
           if (playerStats) {
             boxScoreStats = {
-              batting: playerStats.stats?.batting || {},
-              pitching: playerStats.stats?.pitching || {},
+              batting: playerStats?.stats?.batting || {},
+              pitching: playerStats?.stats?.pitching || {},
             };
             boxScoreSeasonStats = {
               batting: playerStats.seasonStats?.batting || {},
@@ -150,8 +183,8 @@ export const useMLBData = (teamId) => {
         }
 
         const seasonSplit = player.stats?.[0]?.splits?.find(
-          (split) =>
-            split.stat.group ===
+          (split: { stat?: { group?: string }; season?: string }) =>
+            split.stat?.group ===
             (player.primaryPosition?.code === "1" ? "pitching" : "hitting"),
         );
         const seasonStats = seasonSplit?.stat || {};
@@ -169,11 +202,11 @@ export const useMLBData = (teamId) => {
             seasonYear,
           },
         });
-      } catch (err) {
-        dispatch({ type: "SET_ERROR", payload: err.message });
+      } catch (err: unknown) {
+        dispatch({ type: "SET_ERROR", payload: err instanceof Error ? err.message : String(err) });
       }
     },
-    [boxScore],
+    [boxScore, state.isFetchingPlayer, state.todaysGame],
   );
 
   return {

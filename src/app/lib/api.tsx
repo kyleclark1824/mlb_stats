@@ -9,21 +9,21 @@ export const fetchTeams = async () => {
   return data.teams || [];
 };
 
-export const fetchTeamDetails = async (teamId) => {
+export const fetchTeamDetails = async (teamId: string | number) => {
   const response = await fetch(`${apiHost}/teams/${teamId}`);
   if (!response.ok) throw new Error("Failed to fetch team details");
   const data = await response.json();
   return data.teams?.[0] || {};
 };
 
-export const fetchRoster = async (teamId) => {
+export const fetchRoster = async (teamId: string | number) => {
   const response = await fetch(`${apiHost}/teams/${teamId}/roster`);
   if (!response.ok) throw new Error("Failed to fetch roster");
   const { roster } = await response.json();
   return roster || [];
 };
 
-export const fetchSchedule = async (teamId) => {
+export const fetchSchedule = async (teamId: string | number) => {
   const response = await fetch(
     `${apiHost}/schedule?sportId=1&teamId=${teamId}`,
   );
@@ -32,20 +32,20 @@ export const fetchSchedule = async (teamId) => {
   return dates?.[0]?.games?.[0] || null;
 };
 
-export const fetchBoxScore = async (gamePk) => {
+export const fetchBoxScore = async (gamePk: string | number) => {
   const response = await fetch(`${apiHost}/game/${gamePk}/boxscore`);
   if (!response.ok) throw new Error("Failed to fetch box score");
   return await response.json();
 };
 
-export const fetchPlayerDetails = async (playerId) => {
+export const fetchPlayerDetails = async (playerId: string | number) => {
   const response = await fetch(`${apiHost}/people/${playerId}?hydrate=stats`);
   if (!response.ok) throw new Error("Failed to fetch player details");
   const { people } = await response.json();
   return people?.[0] || null;
 };
 
-export const fetchLastGame = async (teamId) => {
+export const fetchLastGame = async (teamId: string | number) => {
   const today = new Date().toISOString().split("T")[0];
   const seasonStart = "2025-03-28"; // Adjust based on actual season start
   const response = await fetch(
@@ -55,7 +55,7 @@ export const fetchLastGame = async (teamId) => {
   const { dates } = await response.json();
   for (let i = dates.length - 1; i >= 0; i--) {
     const games = dates[i].games;
-    for (let game of games) {
+    for (const game of games) {
       if (game.status?.abstractGameState === "Final") {
         return game;
       }

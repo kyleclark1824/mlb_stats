@@ -1,5 +1,16 @@
-// TeamRecord Component
-export const TeamRecord = ({ record }) => (
+import React from "react";
+
+interface TeamRecordData {
+  wins: number;
+  losses: number;
+  pct: string | number;
+}
+
+interface TeamRecordProps {
+  record: TeamRecordData;
+}
+
+export const TeamRecord: React.FC<TeamRecordProps> = ({ record }) => (
   <div className="bg-white dark:bg-gray-800 shadow-lg rounded-lg p-6">
     <h2 className="text-2xl font-semibold text-red-700 dark:text-red-300 mb-4">
       Team Record
