@@ -4,8 +4,9 @@ import { prisma } from '@/lib/prisma';
 // GET specific event
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  context: { params: { id: string } }
 ) {
+  const { params } = context;
   try {
     const event = await prisma.calendarEvent.findUnique({
       where: {
