@@ -1,8 +1,10 @@
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/ban-ts-comment */
 "use client";
 
 import { useState, useEffect } from 'react';
+import Image from 'next/image';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns';
+import DatePicker from 'react-datepicker';
+import 'react-datepicker/dist/react-datepicker.css';
 
 import { CalendarEvent, fetchMonthEvents, createEvent, deleteEvent } from '@/lib/calendar';
 
@@ -32,18 +34,33 @@ export default function Calendar() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [showEventModal, setShowEventModal] = useState(false);
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  // Helper to round to nearest half hour
+  function getRoundedHalfHour(date = new Date()) {
+    const d = new Date(date);
+    d.setSeconds(0, 0);
+    const minutes = d.getMinutes();
+    if (minutes < 15) {
+      d.setMinutes(0);
+    } else if (minutes < 45) {
+      d.setMinutes(30);
+    } else {
+      d.setMinutes(0);
+      d.setHours(d.getHours() + 1);
+    }
+    return d;
+  }
+
+  const [selectedStartDate, setSelectedStartDate] = useState<Date | null>(getRoundedHalfHour());
+  const [selectedEndDate, setSelectedEndDate] = useState<Date | null>(getRoundedHalfHour(new Date(Date.now() + 60 * 60 * 1000)));
+
   const [newEvent, setNewEvent] = useState<Omit<CalendarEvent, 'id' | 'createdAt' | 'updatedAt'>>({
     title: '',
     startDate: new Date(),
-    endDate: null,
-    // removed type and eventType
+    endDate: new Date(),
     description: '',
     isAllDay: false,
     location: ''
   });
-  const [startTime, setStartTime] = useState('');
-  const [endTime, setEndTime] = useState('');
   const [viewMode, setViewMode] = useState<'month' | 'week' | 'day'>('month');
 
   const [bgIndex, setBgIndex] = useState(0);
@@ -55,12 +72,12 @@ export default function Calendar() {
       setBgIndex((prev) => (prev + 1) % randomImages.length);
     }, 10000);
     return () => clearInterval(interval);
-  }, []);
+  }, [randomImages.length]);
   useEffect(() => {
     if (bgIndex === 0) {
       setRandomImages(getRandomizedImages(bgImages));
     }
-  }, [bgIndex]);
+  }, [bgIndex, currentDate]);
 
   // Load events from database on mount and when month changes
   useEffect(() => {
@@ -83,26 +100,13 @@ export default function Calendar() {
 
   const addEvent = async () => {
     console.log('Add Event button clicked');
-    if (!selectedDate || !newEvent.title || !startTime || !endTime) return;
+  if (!selectedStartDate || !selectedEndDate || !newEvent.title) return;
 
-    // Combine selectedDate with start and end times
-    const [startHours, startMinutes] = startTime.split(":");
-    const [endHours, endMinutes] = endTime.split(":");
-    const startDateTime = new Date(selectedDate);
-    startDateTime.setHours(Number(startHours));
-    startDateTime.setMinutes(Number(startMinutes));
-    startDateTime.setSeconds(0);
-    startDateTime.setMilliseconds(0);
-    const endDateTime = new Date(selectedDate);
-    endDateTime.setHours(Number(endHours));
-    endDateTime.setMinutes(Number(endMinutes));
-    endDateTime.setSeconds(0);
-    endDateTime.setMilliseconds(0);
-
+    // Use selectedStartDate and selectedEndDate directly from react-datepicker
     const eventData = {
       ...newEvent,
-      startDate: startDateTime,
-      endDate: endDateTime,
+      startDate: selectedStartDate,
+      endDate: selectedEndDate,
     };
     // Debug log: show event data before sending to Supabase
     console.log('Creating event with data:', eventData);
@@ -119,8 +123,6 @@ export default function Calendar() {
         isAllDay: false,
         location: ''
       });
-      setStartTime('');
-      setEndTime('');
     }
   };
 
@@ -132,25 +134,35 @@ export default function Calendar() {
   };
 
   const openNewEventModal = (date: Date) => {
-    setSelectedDate(date);
+    // Use rounded half hour for start, 1 hour after for end
+    const start = getRoundedHalfHour(date);
+    const end = new Date(start.getTime() + 60 * 60 * 1000);
+    setSelectedStartDate(start);
+    setSelectedEndDate(end);
     setNewEvent(prev => ({
       ...prev,
-      startDate: date,
-      endDate: date
+      startDate: start,
+      endDate: end
     }));
     setShowEventModal(true);
   };
 
+  // Returns events that occur on a given date (including multi-day events)
   const getEventsForDate = (date: Date) => {
     return events.filter(event => {
-      const eventDate = event.startDate;
-      return format(eventDate, 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd');
+      const start = new Date(event.startDate);
+      const end = event.endDate ? new Date(event.endDate) : start;
+      // Check if the date is within the event's range (inclusive)
+      return (
+        date >= new Date(start.getFullYear(), start.getMonth(), start.getDate()) &&
+        date <= new Date(end.getFullYear(), end.getMonth(), end.getDate())
+      );
     });
   };
 
   return (
     <div className="min-h-screen w-full relative bg-gray-100 dark:bg-gray-900">
-      <img src={randomImages[bgIndex]} alt="Calendar BG" className="absolute inset-0 w-full h-full object-cover opacity-30 z-0 transition-all duration-1000" />
+      <Image src={randomImages[bgIndex]} alt="Calendar BG" fill priority className="absolute inset-0 w-full h-full object-cover opacity-30 z-0 transition-all duration-1000" />
       <div className="absolute top-6 left-6 z-10">
         <button
           className="px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded-lg text-gray-800 dark:text-gray-100 hover:bg-gray-300 dark:hover:bg-gray-600 transition"
@@ -253,15 +265,28 @@ export default function Calendar() {
                       {dayEvents.map(event => (
                         <div
                           key={event.id}
-                          className="text-sm p-1 rounded bg-blue-900/80 dark:bg-blue-800 flex justify-between items-center cursor-pointer text-white"
+                          className="text-sm p-1 rounded bg-blue-900/80 dark:bg-blue-800 flex justify-between items-center cursor-pointer text-white hover:bg-blue-600 dark:hover:bg-blue-600"
                           onClick={e => {
                             e.stopPropagation();
+                            // Type guard for CalendarEvent with fallback for snake_case keys
+                            const getDateField = (obj: CalendarEvent, camel: keyof CalendarEvent, snake: string, fallback: Date): Date => {
+                              if (obj[camel]) return new Date(obj[camel] as Date);
+                              // @ts-expect-error: fallback for snake_case
+                              if (obj[snake]) return new Date(obj[snake]);
+                              return fallback;
+                            };
+                            const getEndDateField = (obj: CalendarEvent, camel: keyof CalendarEvent, snake: string): Date | null => {
+                              if (obj[camel]) return new Date(obj[camel] as Date);
+                              // @ts-expect-error: fallback for snake_case
+                              if (obj[snake]) return new Date(obj[snake]);
+                              return null;
+                            };
                             setViewEvent({
                               ...event,
-                              startDate: (event.startDate ? event.startDate : (event as any).start_date ? new Date((event as any).start_date) : new Date()),
-                              endDate: (event.endDate ? event.endDate : (event as any).end_date ? new Date((event as any).end_date) : null),
-                              createdAt: (event.createdAt ? event.createdAt : (event as any).created_at ? new Date((event as any).created_at) : new Date()),
-                              updatedAt: (event.updatedAt ? event.updatedAt : (event as any).updated_at ? new Date((event as any).updated_at) : new Date()),
+                              startDate: getDateField(event, 'startDate', 'start_date', new Date()),
+                              endDate: getEndDateField(event, 'endDate', 'end_date'),
+                              createdAt: getDateField(event, 'createdAt', 'created_at', new Date()),
+                              updatedAt: getDateField(event, 'updatedAt', 'updated_at', new Date()),
                             });
                           }}
                         >
@@ -304,7 +329,7 @@ export default function Calendar() {
                   return (
                     <div
                       key={day.toISOString()}
-                      className="min-h-[100px] p-2 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
+                      className="min-h-[180px] h-auto p-2 pb-8 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
                       onClick={e => {
                         if (e.target === e.currentTarget) {
                           openNewEventModal(day);
@@ -351,7 +376,7 @@ export default function Calendar() {
               <div className="p-2 text-center font-semibold">
                 {format(currentDate, 'EEEE, MMMM d, yyyy')}
               </div>
-              <div className="min-h-[100px] p-2 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
+              <div className="min-h-[180px] h-auto p-2 pb-8 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
                 onClick={e => {
                   if (e.target === e.currentTarget) {
                     openNewEventModal(currentDate);
@@ -362,7 +387,7 @@ export default function Calendar() {
                   {getEventsForDate(currentDate).map(event => (
                     <div
                       key={event.id}
-                      className="text-sm p-1 rounded bg-blue-100 dark:bg-blue-900 flex justify-between items-center cursor-pointer"
+                            className="text-sm p-1 rounded bg-blue-100 dark:bg-blue-900 flex justify-between items-center cursor-pointer hover:bg-blue-300 dark:hover:bg-blue-700"
                       onClick={e => {
                         e.stopPropagation();
                         setViewEvent(event);
@@ -394,11 +419,11 @@ export default function Calendar() {
         {/* New Event Modal */}
         {showEventModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-            <div className="bg-white dark:bg-gray-800 p-6 rounded-lg w-full max-w-md relative overflow-hidden">
-              <img src="/bella_new.jpg" alt="Event BG" className="absolute inset-0 w-full h-full object-cover opacity-20 z-0" />
+            <div className="bg-white dark:bg-gray-800 p-6 rounded-lg w-full max-w-4xl relative overflow-visible">
+              <Image src={randomImages[bgIndex]} alt="Event BG" fill priority className="absolute inset-0 w-full h-full object-cover opacity-20 z-0 transition-all duration-1000" />
               <div className="relative z-10">
                 <h2 className="text-xl font-bold mb-4">
-                  Add Event for {selectedDate ? format(selectedDate, 'MMMM d, yyyy') : ''}
+                  Add Event for {selectedStartDate ? format(selectedStartDate, 'MMMM d, yyyy') : ''}
                 </h2>
                 <div className="space-y-4">
                   <div>
@@ -407,26 +432,44 @@ export default function Calendar() {
                       type="text"
                       value={newEvent.title}
                       onChange={e => setNewEvent(prev => ({ ...prev, title: e.target.value }))}
-                      className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600"
+                      className={`w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 ${!newEvent.title ? 'border-red-500' : ''}`}
                     />
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Start Time</label>
-                    <input
-                      type="time"
-                      value={startTime}
-                      onChange={e => setStartTime(e.target.value)}
-                      className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">End Time</label>
-                    <input
-                      type="time"
-                      value={endTime}
-                      onChange={e => setEndTime(e.target.value)}
-                      className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600"
-                    />
+                  <div className="space-y-4">
+                    <div className="w-full">
+                      <label className="block text-sm mb-1">Start Date & Time</label>
+                      <DatePicker
+                        selected={selectedStartDate ?? new Date()}
+                        onChange={date => {
+                          if (date) {
+                            setSelectedStartDate(date);
+                            setNewEvent(prev => ({ ...prev, startDate: date }));
+                          }
+                        }}
+                        showTimeSelect
+                        timeFormat="HH:mm"
+                        timeIntervals={15}
+                        dateFormat="MMMM d, yyyy h:mm aa"
+                        className="px-3 py-2 border rounded w-full min-w-[400px] dark:bg-gray-700 dark:border-gray-600"
+                      />
+                    </div>
+                    <div className="w-full">
+                      <label className="block text-sm mb-1">End Date & Time</label>
+                      <DatePicker
+                        selected={selectedEndDate ?? new Date()}
+                        onChange={date => {
+                          if (date) {
+                            setSelectedEndDate(date);
+                            setNewEvent(prev => ({ ...prev, endDate: date }));
+                          }
+                        }}
+                        showTimeSelect
+                        timeFormat="HH:mm"
+                        timeIntervals={15}
+                        dateFormat="MMMM d, yyyy h:mm aa"
+                        className="px-3 py-2 border rounded w-full min-w-[400px] dark:bg-gray-700 dark:border-gray-600"
+                      />
+                    </div>
                   </div>
                   <div>
                     <label className="block text-sm font-medium mb-1">Location (Optional)</label>
@@ -455,7 +498,8 @@ export default function Calendar() {
                     </button>
                     <button
                       onClick={addEvent}
-                      className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                      className={`px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 ${!newEvent.title ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      disabled={!newEvent.title}
                     >
                       Add Event
                     </button>
@@ -467,7 +511,7 @@ export default function Calendar() {
         )}
         {viewEvent && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white dark:bg-gray-800 p-6 rounded-lg w-full max-w-md">
+            <div className="bg-white dark:bg-gray-800 p-6 rounded-lg w-full max-w-xl">
               <h2 className="text-xl font-bold mb-4">Event Details</h2>
               <div className="mb-2"><span className="font-semibold">Title:</span> {viewEvent.title}</div>
               <div className="mb-2"><span className="font-semibold">Date:</span> {viewEvent.startDate ? format(viewEvent.startDate, 'MMMM d, yyyy') : ''}</div>
