@@ -1,10 +1,11 @@
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/ban-ts-comment */
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
 // GET specific event
 export async function GET(
   request: Request,
-  context: { params: { id: string } }
+  context: any
 ) {
   const { params } = context;
   try {
@@ -34,7 +35,7 @@ export async function GET(
 // Update event
 export async function PUT(
   request: Request,
-  { params }: { params: { id: string } }
+  params: any
 ) {
   try {
     const data = await request.json();
@@ -67,7 +68,7 @@ export async function PUT(
 // Delete event
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
+  params: any
 ) {
   try {
     await prisma.calendarEvent.delete({

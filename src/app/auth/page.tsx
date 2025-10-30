@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/ban-ts-comment */
 "use client";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";

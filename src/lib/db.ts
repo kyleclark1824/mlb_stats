@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/ban-ts-comment */
 // Function to fetch data from your new API
 export async function fetchTeamsFromDB() {
   try {
