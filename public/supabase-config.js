@@ -1,3 +1,3 @@
 // Public Supabase config for client-side use
-export const SUPABASE_URL = "YOUR_SUPABASE_URL_HERE";
-export const SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY_HERE";
+export const SUPABASE_URL = "https://drgelpdardysfywlqgyd.supabase.co";
+export const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRyZ2VscGRhcmR5c2Z5d2xxZ3lkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE3NzYxOTgsImV4cCI6MjA3NzM1MjE5OH0.nMq1xHrYzHO7wrBMh_j05ikcaLtQwh7Xe3e3eqoYquU";
