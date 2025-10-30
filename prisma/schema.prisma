@@ -1,0 +1,93 @@
+// This is your Prisma schema file
+// Learn more about it here: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model CalendarEvent {
+  id          String    @id @default(cuid())
+  title       String
+  description String?
+  startDate   DateTime
+  endDate     DateTime?
+  gameId      String?   // Optional link to MLB game
+  teamId      String?   // Optional link to team
+  eventType   String    // e.g., 'game', 'watch-party', 'practice', etc.
+  location    String?
+  isAllDay    Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+// Models for MLB Stats
+model Team {
+  id            String    @id
+  name          String
+  abbreviation  String?
+  teamCode      String?
+  locationName  String?
+  division      String?
+  league        String?
+  venue         String?
+  players       Player[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model Player {
+  id              String    @id
+  fullName        String
+  firstName       String?
+  lastName        String?
+  primaryNumber   String?
+  currentAge      Int?
+  birthDate       String?
+  birthCity       String?
+  birthCountry    String?
+  height          String?
+  weight          Int?
+  active          Boolean   @default(true)
+  primaryPosition String?
+  batSide         String?
+  pitchHand       String?
+  teamId          String?
+  team            Team?     @relation(fields: [teamId], references: [id])
+  stats           Stats[]
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model Stats {
+  id            String   @id @default(cuid())
+  playerId      String
+  player        Player   @relation(fields: [playerId], references: [id])
+  season        Int
+  gamesPlayed   Int?
+  atBats        Int?
+  hits          Int?
+  doubles       Int?
+  triples       Int?
+  homeRuns      Int?
+  rbi           Int?
+  stolenBases   Int?
+  battingAvg    String?
+  ops           String?
+  era           String?
+  wins          Int?
+  losses        Int?
+  saves         Int?
+  strikeOuts    Int?
+  whip          String?
+  inningsPitched String?
+  isPitching    Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([playerId, season])
+}
