@@ -10,7 +10,6 @@ export interface CalendarEvent {
   endDate?: Date | null;
   gameId?: string | null;
   teamId?: string | null;
-  eventType?: string;
   location?: string | null;
   isAllDay: boolean;
   createdAt: Date;
@@ -23,12 +22,13 @@ export type UpdateCalendarEvent = Partial<CreateCalendarEvent>;
 // Fetch events for a specific month
 export async function fetchMonthEvents(date: Date): Promise<CalendarEvent[]> {
   const startOfMonth = new Date(date.getFullYear(), date.getMonth(), 1).toISOString();
-  const endOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0).toISOString();
+  const endOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59, 999).toISOString();
 
+  // Fetch events that overlap the month: end_date >= startOfMonth AND start_date <= endOfMonth
   const { data, error } = await supabase
     .from('calendar_events')
     .select('*')
-    .gte('start_date', startOfMonth)
+    .gte('end_date', startOfMonth)
     .lte('start_date', endOfMonth)
     .order('start_date', { ascending: true });
 

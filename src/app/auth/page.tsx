@@ -1,8 +1,8 @@
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/ban-ts-comment */
 "use client";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { User } from "@supabase/supabase-js";
 
 export default function AuthPage() {
   const router = useRouter();
@@ -10,7 +10,7 @@ export default function AuthPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
 
   useEffect(() => {
     const getUser = async () => {
@@ -20,12 +20,6 @@ export default function AuthPage() {
     getUser();
     const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
       setUser(session?.user ?? null);
-      if (event === 'SIGNED_IN' && session?.user) {
-        router.push("/calendar");
-      }
-      if (event === 'USER_UPDATED' && session?.user) {
-        router.push("/calendar");
-      }
     });
     return () => {
       listener.subscription.unsubscribe();
@@ -77,7 +71,12 @@ export default function AuthPage() {
     <div className="max-w-md mx-auto mt-16 p-8 bg-gradient-to-br from-blue-50 to-blue-200 dark:from-gray-900 dark:to-gray-800 rounded-xl shadow-lg border border-gray-300">
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-extrabold text-blue-900 dark:text-blue-100">Sign Up / Sign In</h2>
-        <button onClick={() => router.push('/calendar')} className="px-4 py-2 bg-blue-600 text-white rounded shadow hover:bg-blue-700">Back to Calendar</button>
+        {user && (
+          <button onClick={() => router.push('/calendar')} className="px-4 py-2 bg-blue-600 text-white rounded shadow hover:bg-blue-700">Go to Calendar</button>
+        )}
+        {!user && (
+          <button onClick={() => router.push('/')} className="px-4 py-2 bg-blue-600 text-white rounded shadow hover:bg-blue-700">Back to Home</button>
+        )}
       </div>
       <div className="mb-6">
         <span className="font-semibold">Status:</span>

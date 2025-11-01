@@ -1,24 +1,56 @@
 "use client";
-
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 
 import { CalendarEvent, fetchMonthEvents, createEvent, deleteEvent } from '@/lib/calendar';
+import { supabase } from '@/lib/supabase';
 
+// Dynamically import all .jpg files from /public/backgrounds
 const bgImages = [
-  "/IMG_3877.JPG",
-  "/Family_Whiteface.jpg",
-  "/panarama_2.jpg",
-  "/sunset_final_2.jpg",
-  "/20160407_204258.jpg",
-  "/bella_new.jpg",
-  "/Birds.jpg",
-  "/IMG_8636.jpg",
-  "/chicken.jpg",
-  "/20151205_175052.jpg"
+  // List all .jpg files in /public/backgrounds
+  "/backgrounds/20151205_175052.jpg",
+  "/backgrounds/20160407_204258.jpg",
+  "/backgrounds/7.jpg",
+  "/backgrounds/bella_new.jpg",
+  "/backgrounds/Birds.jpg",
+  "/backgrounds/chicken.jpg",
+  "/backgrounds/dad_Day1.JPG",
+  "/backgrounds/Family_Whiteface.jpg",
+  "/backgrounds/Fred2.jpg",
+  "/backgrounds/giraffe.jpg",
+  "/backgrounds/girls_at_barnham.jpg",
+  "/backgrounds/IMG_3029.jpg",
+  "/backgrounds/IMG_3877.JPG",
+  "/backgrounds/IMG_5899 (2).jpg",
+  "/backgrounds/IMG_6007 (2).jpg",
+  "/backgrounds/IMG_6819.jpg",
+  "/backgrounds/IMG_7306.jpg",
+  "/backgrounds/IMG_7382.jpg",
+  "/backgrounds/IMG_8531.jpg",
+  "/backgrounds/IMG_8636.jpg",
+  "/backgrounds/kace1.jpg",
+  "/backgrounds/kace_bubbles.jpg",
+  "/backgrounds/kids.jpg",
+  "/backgrounds/KRM_married.jpg",
+  "/backgrounds/M&R.jpg",
+  "/backgrounds/moon.jpg",
+  "/backgrounds/panarama_2.jpg",
+  "/backgrounds/Preg.jpg",
+  "/backgrounds/preg1.jpg",
+  "/backgrounds/preg3.jpg",
+  "/backgrounds/RaulPainted.jpg",
+  "/backgrounds/summer 2010 030.jpg",
+  "/backgrounds/sunset2.jpg",
+  "/backgrounds/sunset_final_2.jpg",
+  "/backgrounds/Tybee1.jpg",
+  "/backgrounds/uphill.jpg",
+  "/backgrounds/wall1 (2).jpg",
+  "/backgrounds/wall3 (2).jpg",
+  "/backgrounds/wall4 (2).jpg"
 ];
 function getRandomizedImages(images: string[]) {
   const arr = [...images];
@@ -30,6 +62,12 @@ function getRandomizedImages(images: string[]) {
 }
 
 export default function Calendar() {
+
+  const [user, setUser] = useState<unknown>(null);
+  const [isWhitelisted, setIsWhitelisted] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
+
+  const router = useRouter();
   const [viewEvent, setViewEvent] = useState<CalendarEvent | null>(null);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [events, setEvents] = useState<CalendarEvent[]>([]);
@@ -50,6 +88,32 @@ export default function Calendar() {
     return d;
   }
 
+    // Check user authentication and whitelist
+  useEffect(() => {
+    const EMAIL_WHITELIST = [
+      'kyle.clark1824@gmail.com',
+      'maria.clark5550@gmail.com',
+    ];
+    const checkUser = async () => {
+      const { data } = await supabase.auth.getUser();
+      setUser(data?.user || null);
+      if (data?.user?.email && EMAIL_WHITELIST.includes(data.user.email)) {
+        setIsWhitelisted(true);
+      } else {
+        setIsWhitelisted(false);
+      }
+      setAuthChecked(true);
+    };
+    checkUser();
+    // Listen for auth changes
+    const { data: listener } = supabase.auth.onAuthStateChange(() => {
+      checkUser();
+    });
+    return () => {
+      listener?.subscription?.unsubscribe();
+    };
+  }, [currentDate]);
+  
   const [selectedStartDate, setSelectedStartDate] = useState<Date | null>(getRoundedHalfHour());
   const [selectedEndDate, setSelectedEndDate] = useState<Date | null>(getRoundedHalfHour(new Date(Date.now() + 60 * 60 * 1000)));
 
@@ -63,16 +127,27 @@ export default function Calendar() {
   });
   const [viewMode, setViewMode] = useState<'month' | 'week' | 'day'>('month');
 
-  const [bgIndex, setBgIndex] = useState(0);
-  const [randomImages, setRandomImages] = useState<string[]>(getRandomizedImages(bgImages));
+  // Client-only random background image selection to avoid hydration mismatch
+  const [bgIndex, setBgIndex] = useState<number | null>(null);
+  const [randomImages, setRandomImages] = useState<string[]>(bgImages);
   useEffect(() => {
-    setRandomImages(getRandomizedImages(bgImages));
-    setBgIndex(0);
+    // Only run on client
+    // Shuffle images and start with a random index
+    const randomized = getRandomizedImages(bgImages);
+    setRandomImages(randomized);
+    setBgIndex(Math.floor(Math.random() * randomized.length));
     const interval = setInterval(() => {
-      setBgIndex((prev) => (prev + 1) % randomImages.length);
+      setBgIndex(prev => {
+        if (prev === null) return Math.floor(Math.random() * randomized.length);
+        // Pick a random image each time
+        let next = Math.floor(Math.random() * randomized.length);
+        // Avoid repeating the same image
+        if (next === prev) next = (next + 1) % randomized.length;
+        return next;
+      });
     }, 10000);
     return () => clearInterval(interval);
-  }, [randomImages.length]);
+  }, [currentDate]);
   useEffect(() => {
     if (bgIndex === 0) {
       setRandomImages(getRandomizedImages(bgImages));
@@ -86,7 +161,7 @@ export default function Calendar() {
       setEvents(monthEvents);
     };
     loadEvents();
-  }, []);
+  }, [currentDate]);
 
   // Save events to localStorage whenever they change
   useEffect(() => {
@@ -99,17 +174,22 @@ export default function Calendar() {
   const startDayOfWeek = monthStart.getDay();
 
   const addEvent = async () => {
-    console.log('Add Event button clicked');
-  if (!selectedStartDate || !selectedEndDate || !newEvent.title) return;
+    if (!isWhitelisted) {
+      alert('You are not authorized to create events.');
+      return;
+    }
+    if (!selectedStartDate || !selectedEndDate || !newEvent.title) return;
 
-    // Use selectedStartDate and selectedEndDate directly from react-datepicker
     const eventData = {
       ...newEvent,
       startDate: selectedStartDate,
       endDate: selectedEndDate,
     };
-    // Debug log: show event data before sending to Supabase
-    console.log('Creating event with data:', eventData);
+    console.log('Creating event with data:', {
+      ...eventData,
+      startDateISO: selectedStartDate?.toISOString(),
+      endDateISO: selectedEndDate?.toISOString(),
+    });
 
     const createdEvent = await createEvent(eventData);
     if (createdEvent) {
@@ -161,81 +241,72 @@ export default function Calendar() {
   };
 
   return (
-    <div className="min-h-screen w-full relative bg-gray-100 dark:bg-gray-900">
+  <div className="min-h-screen w-full relative bg-gray-100 dark:bg-gray-900">
+    {bgIndex !== null && (
       <Image src={randomImages[bgIndex]} alt="Calendar BG" fill priority className="absolute inset-0 w-full h-full object-cover opacity-30 z-0 transition-all duration-1000" />
-      <div className="absolute top-6 left-6 z-10">
-        <button
-          className="px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded-lg text-gray-800 dark:text-gray-100 hover:bg-gray-300 dark:hover:bg-gray-600 transition"
-          onClick={() => window.location.href = '/'}
-        >
-          Back to Home
-        </button>
+    )}
+    <div className="absolute top-6 left-6 z-10">
+      <button
+        className="inline-flex px-6 py-3 bg-blue-600 text-white rounded-lg text-lg font-semibold shadow-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200 ease-in-out cursor-pointer"
+        onClick={() => router.push('/')}
+      >
+        Back to Home
+      </button>
+    </div>
+    <div className="relative z-10 container mx-auto px-4 py-8">
+      <div className="flex justify-end mb-4">
+        {authChecked && isWhitelisted && (
+          <a href="/gallery" className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 mr-2">Gallery</a>
+        )}
+        {authChecked && !user && (
+          <a href="/auth" className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Sign In</a>
+        )}
       </div>
-      <div className="relative z-10 container mx-auto px-4 py-8">
-        <div className="flex justify-end mb-4">
-          <a href="/auth" className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Sign Up / Sign In</a>
-        </div>
-        <div className="flex items-center justify-between mb-8">
-          <h1 className="text-4xl font-bold">Family Calendar</h1>
-        </div>
-        <div className="mb-8">
-          <div className="flex justify-between items-center mb-6">
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => {
-                  if (viewMode === 'month') setCurrentDate(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
-                  if (viewMode === 'week') setCurrentDate(prev => {
-                    const d = new Date(prev);
-                    d.setDate(d.getDate() - 7);
-                    return d;
-                  });
-                  if (viewMode === 'day') setCurrentDate(prev => {
-                    const d = new Date(prev);
-                    d.setDate(d.getDate() - 1);
-                    return d;
-                  });
-                }}
-                className="px-2 py-1 rounded-full bg-gray-200 dark:bg-gray-700 text-xl font-bold hover:bg-gray-300 dark:hover:bg-gray-600"
-                aria-label="Previous"
-              >&#8592;</button>
-              <h1 className="text-2xl font-bold">
-                {viewMode === 'month' && format(currentDate, 'MMMM yyyy')}
-                {viewMode === 'week' && `Week of ${format(new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate() - currentDate.getDay()), 'MMM d, yyyy')}`}
-                {viewMode === 'day' && format(currentDate, 'EEEE, MMMM d, yyyy')}
-              </h1>
-              <button
-                onClick={() => {
-                  if (viewMode === 'month') setCurrentDate(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
-                  if (viewMode === 'week') setCurrentDate(prev => {
-                    const d = new Date(prev);
-                    d.setDate(d.getDate() + 7);
-                    return d;
-                  });
-                  if (viewMode === 'day') setCurrentDate(prev => {
-                    const d = new Date(prev);
-                    d.setDate(d.getDate() + 1);
-                    return d;
-                  });
-                }}
-                className="px-2 py-1 rounded-full bg-gray-200 dark:bg-gray-700 text-xl font-bold hover:bg-gray-300 dark:hover:bg-gray-600"
-                aria-label="Next"
-              >&#8594;</button>
-            </div>
-            <div className="space-x-2">
-              <button
-                onClick={() => setViewMode('month')}
-                className={`px-3 py-1 rounded ${viewMode === 'month' ? 'bg-blue-600 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100'}`}
-              >Month</button>
-              <button
-                onClick={() => setViewMode('week')}
-                className={`px-3 py-1 rounded ${viewMode === 'week' ? 'bg-blue-600 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100'}`}
-              >Week</button>
-              <button
-                onClick={() => setViewMode('day')}
-                className={`px-3 py-1 rounded ${viewMode === 'day' ? 'bg-blue-600 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100'}`}
-              >Day</button>
-            </div>
+      <div className="flex items-center justify-between mb-8">
+        <div className="flex flex-row w-full items-center justify-between">
+          <div className="flex items-center mb-2 space-x-2">
+            <button
+              className="px-2 py-1 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-100 hover:bg-blue-500 hover:text-white transition"
+              aria-label="Previous Month"
+              onClick={() => setCurrentDate(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))}
+            >
+              &#8592;
+            </button>
+            <h1 className="text-4xl font-bold">Family Calendar</h1>
+            <button
+              className="px-2 py-1 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-100 hover:bg-blue-500 hover:text-white transition"
+              aria-label="Next Month"
+              onClick={() => setCurrentDate(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1))}
+            >
+              &#8594;
+            </button>
           </div>
+          <div className="flex flex-col items-end space-y-2 ml-8">
+            <button
+              className={`px-4 py-2 rounded-lg font-semibold shadow-md transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 ${viewMode === 'month' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-white hover:bg-blue-500 hover:text-white'}`}
+              onClick={() => setViewMode('month')}
+            >
+              Month
+            </button>
+            <button
+              className={`px-4 py-2 rounded-lg font-semibold shadow-md transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 ${viewMode === 'week' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-white hover:bg-blue-500 hover:text-white'}`}
+              onClick={() => setViewMode('week')}
+            >
+              Week
+            </button>
+            <button
+              className={`px-4 py-2 rounded-lg font-semibold shadow-md transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 ${viewMode === 'day' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-white hover:bg-blue-500 hover:text-white'}`}
+              onClick={() => setViewMode('day')}
+            >
+              Day
+            </button>
+          </div>
+        </div>
+      </div>
+      {/* Only show calendar if user is logged in and whitelisted */}
+      {authChecked && isWhitelisted ? (
+        <>
+          {/* Month View */}
           {viewMode === 'month' && (
             <div className="grid grid-cols-7 gap-2">
               {/* Weekday headers */}
@@ -268,26 +339,7 @@ export default function Calendar() {
                           className="text-sm p-1 rounded bg-blue-900/80 dark:bg-blue-800 flex justify-between items-center cursor-pointer text-white hover:bg-blue-600 dark:hover:bg-blue-600"
                           onClick={e => {
                             e.stopPropagation();
-                            // Type guard for CalendarEvent with fallback for snake_case keys
-                            const getDateField = (obj: CalendarEvent, camel: keyof CalendarEvent, snake: string, fallback: Date): Date => {
-                              if (obj[camel]) return new Date(obj[camel] as Date);
-                              // @ts-expect-error: fallback for snake_case
-                              if (obj[snake]) return new Date(obj[snake]);
-                              return fallback;
-                            };
-                            const getEndDateField = (obj: CalendarEvent, camel: keyof CalendarEvent, snake: string): Date | null => {
-                              if (obj[camel]) return new Date(obj[camel] as Date);
-                              // @ts-expect-error: fallback for snake_case
-                              if (obj[snake]) return new Date(obj[snake]);
-                              return null;
-                            };
-                            setViewEvent({
-                              ...event,
-                              startDate: getDateField(event, 'startDate', 'start_date', new Date()),
-                              endDate: getEndDateField(event, 'endDate', 'end_date'),
-                              createdAt: getDateField(event, 'createdAt', 'created_at', new Date()),
-                              updatedAt: getDateField(event, 'updatedAt', 'updated_at', new Date()),
-                            });
+                            setViewEvent(event);
                           }}
                         >
                           <span className="flex-1">
@@ -310,6 +362,7 @@ export default function Calendar() {
               })}
             </div>
           )}
+          {/* Week View */}
           {viewMode === 'week' && (
             <div className="grid grid-cols-7 gap-2">
               {/* Weekday headers */}
@@ -371,6 +424,7 @@ export default function Calendar() {
               })()}
             </div>
           )}
+          {/* Day View */}
           {viewMode === 'day' && (
             <div className="grid grid-cols-1 gap-2">
               <div className="p-2 text-center font-semibold">
@@ -387,7 +441,7 @@ export default function Calendar() {
                   {getEventsForDate(currentDate).map(event => (
                     <div
                       key={event.id}
-                            className="text-sm p-1 rounded bg-blue-100 dark:bg-blue-900 flex justify-between items-center cursor-pointer hover:bg-blue-300 dark:hover:bg-blue-700"
+                      className="text-sm p-1 rounded bg-blue-100 dark:bg-blue-900 flex justify-between items-center cursor-pointer hover:bg-blue-300 dark:hover:bg-blue-700"
                       onClick={e => {
                         e.stopPropagation();
                         setViewEvent(event);
@@ -414,122 +468,129 @@ export default function Calendar() {
               </div>
             </div>
           )}
-        </div>
-
-        {/* New Event Modal */}
-        {showEventModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-            <div className="bg-white dark:bg-gray-800 p-6 rounded-lg w-full max-w-4xl relative overflow-visible">
-              <Image src={randomImages[bgIndex]} alt="Event BG" fill priority className="absolute inset-0 w-full h-full object-cover opacity-20 z-0 transition-all duration-1000" />
-              <div className="relative z-10">
-                <h2 className="text-xl font-bold mb-4">
-                  Add Event for {selectedStartDate ? format(selectedStartDate, 'MMMM d, yyyy') : ''}
-                </h2>
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Event Title</label>
-                    <input
-                      type="text"
-                      value={newEvent.title}
-                      onChange={e => setNewEvent(prev => ({ ...prev, title: e.target.value }))}
-                      className={`w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 ${!newEvent.title ? 'border-red-500' : ''}`}
-                    />
-                  </div>
+          {/* New Event Modal */}
+          {showEventModal && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+              <div className="bg-white dark:bg-gray-800 p-6 rounded-lg w-full max-w-4xl relative overflow-visible">
+                {bgIndex !== null && (
+                  <Image src={randomImages[bgIndex]} alt="Event BG" fill priority className="absolute inset-0 w-full h-full object-cover opacity-20 z-0 transition-all duration-1000" />
+                )}
+                <div className="relative z-10">
+                  <h2 className="text-xl font-bold mb-4">
+                    Add Event for {selectedStartDate ? format(selectedStartDate, 'MMMM d, yyyy') : ''}
+                  </h2>
                   <div className="space-y-4">
-                    <div className="w-full">
-                      <label className="block text-sm mb-1">Start Date & Time</label>
-                      <DatePicker
-                        selected={selectedStartDate ?? new Date()}
-                        onChange={date => {
-                          if (date) {
-                            setSelectedStartDate(date);
-                            setNewEvent(prev => ({ ...prev, startDate: date }));
-                          }
-                        }}
-                        showTimeSelect
-                        timeFormat="HH:mm"
-                        timeIntervals={15}
-                        dateFormat="MMMM d, yyyy h:mm aa"
-                        className="px-3 py-2 border rounded w-full min-w-[400px] dark:bg-gray-700 dark:border-gray-600"
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Event Title</label>
+                      <input
+                        type="text"
+                        value={newEvent.title}
+                        onChange={e => setNewEvent(prev => ({ ...prev, title: e.target.value }))}
+                        className={`w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 ${!newEvent.title ? 'border-red-500' : ''}`}
                       />
                     </div>
-                    <div className="w-full">
-                      <label className="block text-sm mb-1">End Date & Time</label>
-                      <DatePicker
-                        selected={selectedEndDate ?? new Date()}
-                        onChange={date => {
-                          if (date) {
-                            setSelectedEndDate(date);
-                            setNewEvent(prev => ({ ...prev, endDate: date }));
-                          }
-                        }}
-                        showTimeSelect
-                        timeFormat="HH:mm"
-                        timeIntervals={15}
-                        dateFormat="MMMM d, yyyy h:mm aa"
-                        className="px-3 py-2 border rounded w-full min-w-[400px] dark:bg-gray-700 dark:border-gray-600"
+                    <div className="space-y-4">
+                      <div className="w-full">
+                        <label className="block text-sm mb-1">Start Date & Time</label>
+                        <DatePicker
+                          selected={selectedStartDate ?? new Date()}
+                          onChange={date => {
+                            if (date) {
+                              setSelectedStartDate(date);
+                              setNewEvent(prev => ({ ...prev, startDate: date }));
+                            }
+                          }}
+                          showTimeSelect
+                          timeFormat="HH:mm"
+                          timeIntervals={15}
+                          dateFormat="MMMM d, yyyy h:mm aa"
+                          className="px-3 py-2 border rounded w-full min-w-[400px] dark:bg-gray-700 dark:border-gray-600"
+                        />
+                      </div>
+                      <div className="w-full">
+                        <label className="block text-sm mb-1">End Date & Time</label>
+                        <DatePicker
+                          selected={selectedEndDate ?? new Date()}
+                          onChange={date => {
+                            if (date) {
+                              setSelectedEndDate(date);
+                              setNewEvent(prev => ({ ...prev, endDate: date }));
+                            }
+                          }}
+                          showTimeSelect
+                          timeFormat="HH:mm"
+                          timeIntervals={15}
+                          dateFormat="MMMM d, yyyy h:mm aa"
+                          className="px-3 py-2 border rounded w-full min-w-[400px] dark:bg-gray-700 dark:border-gray-600"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Location (Optional)</label>
+                      <input
+                        type="text"
+                        value={newEvent.location || ''}
+                        onChange={e => setNewEvent(prev => ({ ...prev, location: e.target.value }))}
+                        className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600"
                       />
                     </div>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Location (Optional)</label>
-                    <input
-                      type="text"
-                      value={newEvent.location || ''}
-                      onChange={e => setNewEvent(prev => ({ ...prev, location: e.target.value }))}
-                      className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Description (Optional)</label>
-                    <textarea
-                      value={newEvent.description}
-                      onChange={e => setNewEvent(prev => ({ ...prev, description: e.target.value }))}
-                      className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600"
-                      rows={3}
-                    />
-                  </div>
-                  <div className="flex justify-end space-x-2">
-                    <button
-                      onClick={() => setShowEventModal(false)}
-                      className="px-4 py-2 text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={addEvent}
-                      className={`px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 ${!newEvent.title ? 'opacity-50 cursor-not-allowed' : ''}`}
-                      disabled={!newEvent.title}
-                    >
-                      Add Event
-                    </button>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Description (Optional)</label>
+                      <textarea
+                        value={newEvent.description}
+                        onChange={e => setNewEvent(prev => ({ ...prev, description: e.target.value }))}
+                        className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600"
+                        rows={3}
+                      />
+                    </div>
+                    <div className="flex justify-end space-x-2">
+                      <button
+                        onClick={() => setShowEventModal(false)}
+                        className="px-4 py-2 text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={addEvent}
+                        className={`px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 ${!newEvent.title ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        disabled={!newEvent.title}
+                      >
+                        Add Event
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
-          </div>
-        )}
-        {viewEvent && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white dark:bg-gray-800 p-6 rounded-lg w-full max-w-xl">
-              <h2 className="text-xl font-bold mb-4">Event Details</h2>
-              <div className="mb-2"><span className="font-semibold">Title:</span> {viewEvent.title}</div>
-              <div className="mb-2"><span className="font-semibold">Date:</span> {viewEvent.startDate ? format(viewEvent.startDate, 'MMMM d, yyyy') : ''}</div>
-              <div className="mb-2"><span className="font-semibold">Time:</span> {viewEvent.startDate ? format(viewEvent.startDate, 'h:mm a') : ''} - {viewEvent.endDate ? format(viewEvent.endDate, 'h:mm a') : ''}</div>
-              {viewEvent.location && <div className="mb-2"><span className="font-semibold">Location:</span> {viewEvent.location}</div>}
-              {viewEvent.description && <div className="mb-2"><span className="font-semibold">Description:</span> {viewEvent.description}</div>}
-              <div className="flex justify-end mt-4">
-                <button
-                  onClick={() => setViewEvent(null)}
-                  className="px-4 py-2 bg-gray-700 text-white rounded hover:bg-gray-900"
-                >
-                  Close
-                </button>
+          )}
+          {/* View Event Modal */}
+          {viewEvent && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+              <div className="bg-white dark:bg-gray-800 p-6 rounded-lg w-full max-w-xl">
+                <h2 className="text-xl font-bold mb-4">Event Details</h2>
+                <div className="mb-2"><span className="font-semibold">Title:</span> {viewEvent.title}</div>
+                <div className="mb-2"><span className="font-semibold">Date:</span> {viewEvent.startDate ? format(viewEvent.startDate, 'MMMM d, yyyy') : ''}</div>
+                <div className="mb-2"><span className="font-semibold">Time:</span> {viewEvent.startDate ? format(viewEvent.startDate, 'h:mm a') : ''} - {viewEvent.endDate ? format(viewEvent.endDate, 'h:mm a') : ''}</div>
+                {viewEvent.location && <div className="mb-2"><span className="font-semibold">Location:</span> {viewEvent.location}</div>}
+                {viewEvent.description && <div className="mb-2"><span className="font-semibold">Description:</span> {viewEvent.description}</div>}
+                <div className="flex justify-end mt-4">
+                  <button
+                    onClick={() => setViewEvent(null)}
+                    className="px-4 py-2 bg-gray-700 text-white rounded hover:bg-gray-900"
+                  >
+                    Close
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
-        )}
-      </div>
+          )}
+        </>
+      ) : authChecked ? (
+        <div className="text-center text-xl text-red-600 mt-12">Only familia can see the secret squirrel stuff! (login to prove it)</div>
+      ) : (
+        <div className="text-center text-xl text-gray-600 mt-12">Checking authentication...</div>
+      )}
     </div>
+  </div>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import Image from "next/image";
 import { PlayerDetails } from "@/components/player-details";
 import { Roster } from "@/components/roster";
 import { TeamDropdown } from "@/components/team-dropdown";
@@ -50,7 +51,7 @@ export default function Page() {
       setBgIndex((prev) => (prev + 1) % randomImages.length);
     }, 10000);
     return () => clearInterval(interval);
-  }, []);
+  }, [randomImages.length]);
   useEffect(() => {
     if (bgIndex === 0) {
       setRandomImages(getRandomizedImages(bgImages));
@@ -71,20 +72,22 @@ export default function Page() {
 
   return (
     <div className="min-h-screen w-full relative bg-gray-100 dark:bg-gray-900">
-      <img
+      <Image
         src={randomImages[bgIndex]}
         alt="MLB BG"
+        fill
+        priority
         className="absolute inset-0 w-full h-full object-cover opacity-30 z-0 transition-all duration-1000"
       />
-      <div className="absolute top-6 left-6 z-10">
-        <button
-          className="px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded-lg text-gray-800 dark:text-gray-100 hover:bg-gray-300 dark:hover:bg-gray-600 transition"
-          onClick={() => { window.location.href = '/'; }}
-        >
-          Back to Home
-        </button>
-      </div>
       <div className="relative z-10 container mx-auto px-4 py-8">
+        <div className="sticky top-0 flex justify-start mb-4 z-20">
+          <button
+            className="px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded-lg text-gray-800 dark:text-gray-100 hover:bg-gray-300 dark:hover:bg-gray-600 transition cursor-pointer"
+            onClick={() => { window.location.href = '/'; }}
+          >
+            Back to Home
+          </button>
+        </div>
         <ErrorBoundary>
           <div className="flex flex-col space-y-4">
             <div className="flex items-center justify-between">

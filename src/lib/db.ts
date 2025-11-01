@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/ban-ts-comment */
 // Function to fetch data from your new API
 export async function fetchTeamsFromDB() {
   try {
@@ -23,7 +22,7 @@ export async function fetchPlayersFromDB() {
 }
 
 // Function to save data to your database
-export async function saveTeamToDB(teamData: any) {
+export async function saveTeamToDB(teamData: unknown) {
   try {
     const response = await fetch('/api/teams', {
       method: 'POST',
@@ -40,7 +39,7 @@ export async function saveTeamToDB(teamData: any) {
   }
 }
 
-export async function savePlayerToDB(playerData: any) {
+export async function savePlayerToDB(playerData: unknown) {
   try {
     const response = await fetch('/api/players', {
       method: 'POST',
@@ -56,3 +55,4 @@ export async function savePlayerToDB(playerData: any) {
     return null;
   }
 }
+// Function to fetch data from your new API
